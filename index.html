@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Linie 1 Beruf B2 – Kapitel 4: Tourismus | Test zum Klicken</title>
+<script data-goatcounter="https://aguitoo.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+<style>
+:root{
+  --ink:#17303c; --ink-soft:#4d6672; --line:#d8e0e3;
+  --paper:#fff; --surface:#f2f5f6;
+  --accent:#e0700f; --accent-dark:#b95a08; --sea:#1a6076;
+  --ok:#1f7a52; --ok-bg:#e7f4ee; --no:#b3261e; --no-bg:#fbeceb;
+  --radius:10px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--surface);color:var(--ink);
+  font-family:Calibri,"Segoe UI",system-ui,-apple-system,sans-serif;font-size:17px;line-height:1.5}
+.wrap{max-width:820px;margin:0 auto;padding:0 16px 80px}
+
+header{background:var(--sea);color:#fff;padding:26px 0 22px;border-bottom:5px solid var(--accent)}
+header .wrap{padding-bottom:0}
+.book{font-size:.95rem;color:#b9d6df;margin:0 0 4px}
+h1{margin:0;font-size:1.75rem;font-weight:700;line-height:1.15}
+.sub{margin:6px 0 0;color:#cfe3ea;font-size:1rem}
+
+nav.tabs{display:flex;gap:8px;margin:18px 0 0;flex-wrap:wrap}
+nav.tabs button{font:inherit;font-weight:600;cursor:pointer;background:rgba(255,255,255,.12);
+  color:#e8f2f5;border:1px solid rgba(255,255,255,.28);border-bottom:none;padding:10px 16px;border-radius:8px 8px 0 0}
+nav.tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);border-color:var(--surface)}
+nav.tabs button:focus-visible{outline:3px solid #ffd08a;outline-offset:2px}
+
+.score{position:sticky;top:0;z-index:20;background:var(--paper);border:1px solid var(--line);border-top:none;
+  border-radius:0 0 var(--radius) var(--radius);padding:12px 16px;margin-bottom:22px;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 2px 6px rgba(23,48,60,.07)}
+.score .points{font-size:1.25rem;font-weight:700;white-space:nowrap}
+.score .points span{color:var(--accent-dark)}
+.bar{flex:1 1 160px;height:9px;background:var(--surface);border-radius:99px;overflow:hidden;min-width:120px}
+.bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:99px;transition:width .35s ease}
+.score .grade{font-weight:600;color:var(--ink-soft);white-space:nowrap}
+
+section.task{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px 18px 16px;margin-bottom:20px}
+.task h2{margin:0 0 4px;font-size:1.06rem;font-weight:700;display:flex;gap:10px;align-items:baseline}
+.task h2 b{color:var(--accent-dark);font-size:1.2rem;min-width:1.1em}
+.task .hint{margin:2px 0 14px 30px;color:var(--ink-soft);font-size:.93rem}
+.body{margin:14px 0 0 30px;display:flex;flex-direction:column;gap:16px}
+@media(max-width:560px){.body,.task .hint{margin-left:0}}
+
+.item{border-left:3px solid var(--surface);padding-left:12px}
+.item.ok{border-left-color:var(--ok)}
+.item.no{border-left-color:var(--no)}
+.cue{display:flex;gap:8px;align-items:baseline;font-weight:600}
+.cue .no-num{color:var(--ink-soft);min-width:1.4em}
+.cue .mark{margin-left:auto;font-size:1.05rem;font-weight:700}
+.item.ok .mark{color:var(--ok)}
+.item.no .mark{color:var(--no)}
+.sol{display:block;margin:7px 0 0;font-size:.92rem;color:var(--ok);background:var(--ok-bg);
+  border-left:3px solid var(--ok);padding:4px 9px;border-radius:0 5px 5px 0}
+
+/* Klick-Bausteine */
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 0}
+button.chip{font:inherit;cursor:pointer;background:#fafcfc;border:1px solid #b9c6cb;border-radius:7px;
+  padding:5px 13px;color:var(--ink);line-height:1.35}
+button.chip:hover{background:#fff2e3;border-color:var(--accent)}
+button.chip[aria-pressed="true"]{background:var(--sea);border-color:var(--sea);color:#fff;font-weight:600}
+button.chip:disabled{opacity:.32;cursor:default;background:#fafcfc;border-style:dashed}
+button.chip.solmark{border-color:var(--ok);background:var(--ok-bg);color:var(--ok);font-weight:600}
+button.chip:focus-visible{outline:3px solid #ffd08a;outline-offset:2px}
+
+.line{display:flex;gap:6px;flex-wrap:wrap;align-items:center;min-height:44px;margin-top:8px;
+  padding:6px 10px;border:2px dashed #c3d0d5;border-radius:8px;background:#fbfdfd}
+.item.ok .line{border-color:var(--ok);background:var(--ok-bg);border-style:solid}
+.item.no .line{border-color:var(--no);background:var(--no-bg);border-style:solid}
+.line .ph{color:#93a7ae;font-size:.92rem}
+.line button.chip{background:#fff;border-color:var(--sea);color:var(--sea);font-weight:600}
+
+.row{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.lbl{font-weight:600;min-width:180px}
+@media(max-width:560px){.lbl{min-width:100%}}
+.two{display:flex;gap:18px;flex-wrap:wrap;margin-top:6px}
+.grp{display:flex;flex-direction:column;gap:5px}
+.grp .cap{font-size:.85rem;color:var(--ink-soft)}
+
+/* Stellenanzeige */
+.ad{border:1px solid var(--line);border-radius:8px;padding:14px 16px;background:#fcfdfd}
+.ad h3{margin:0 0 10px;font-size:1rem}
+.ad p.head{margin:12px 0 5px;font-weight:600;color:var(--sea)}
+.ad ul{margin:0;padding-left:20px}
+.ad li{margin:9px 0;line-height:2.1}
+button.gap{font:inherit;cursor:pointer;min-width:150px;background:#fff;border:none;border-bottom:2px solid #b9c6cb;
+  border-radius:5px 5px 0 0;padding:3px 10px;color:var(--ink)}
+button.gap.empty{color:#93a7ae}
+button.gap[aria-pressed="true"]{background:#fff2e3;border-bottom-color:var(--accent)}
+button.gap.ok{border-bottom-color:var(--ok);background:var(--ok-bg);color:var(--ok);font-weight:600}
+button.gap.no{border-bottom-color:var(--no);background:var(--no-bg);color:var(--no)}
+button.gap:focus-visible{outline:3px solid #ffd08a;outline-offset:2px}
+.gapsol{color:var(--ok);font-size:.9rem;margin-left:6px}
+
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0 0 30px;align-items:center}
+@media(max-width:560px){.actions{margin-left:0}}
+button.btn{font:inherit;font-weight:600;cursor:pointer;border-radius:7px;padding:8px 16px;
+  background:var(--accent);color:#fff;border:1px solid var(--accent)}
+button.btn:hover{background:var(--accent-dark);border-color:var(--accent-dark)}
+button.btn.ghost{background:#fff;color:var(--sea);border-color:#b9c6cb}
+button.btn.ghost:hover{background:var(--surface)}
+button.btn:focus-visible{outline:3px solid #ffd08a;outline-offset:2px}
+.result{font-weight:700;color:var(--ink-soft)}
+
+.footbar{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;background:var(--paper);
+  border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+.final{margin:0 0 20px;background:var(--paper);border:1px solid var(--line);border-left:6px solid var(--accent);
+  border-radius:var(--radius);padding:16px 18px;display:none}
+.final.on{display:block}
+.final strong{font-size:1.2rem}
+.final .big{font-size:2rem;font-weight:700;color:var(--accent-dark);line-height:1.2;margin:0}
+.final table{width:100%;border-collapse:collapse;margin:14px 0 0;font-size:.95rem}
+.final td{padding:5px 0;border-bottom:1px solid var(--line)}
+.final td:last-child{text-align:right;white-space:nowrap;font-weight:600}
+.final tr.sum td{border-bottom:none;border-top:2px solid var(--ink);font-weight:700;padding-top:8px}
+.final .note{margin:14px 0 0;color:var(--ink-soft)}
+
+.cover{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:24px 22px}
+.cover h2{margin:0 0 4px;font-size:1.35rem}
+.cover .lead{margin:0 0 18px;color:var(--ink-soft)}
+.cover ul.rules{margin:0 0 20px;padding-left:20px}
+.cover ul.rules li{margin:7px 0}
+.cover .fields{display:flex;gap:16px;flex-wrap:wrap;margin:0 0 18px}
+.cover .fld{display:flex;flex-direction:column;gap:5px;flex:1 1 220px}
+.cover label{font-weight:600;font-size:.93rem}
+.cover input{font:inherit;padding:9px 11px;border:1px solid #b9c6cb;border-radius:7px;background:#fafcfc;color:var(--ink)}
+.cover input:focus{outline:none;border-color:var(--accent);background:#fff7ee}
+.cover .warn{color:var(--no);font-size:.9rem;margin:0 0 12px;display:none}
+.cover .warn.on{display:block}
+.meta{display:flex;gap:14px;flex-wrap:wrap;margin:0 0 16px;padding:10px 14px;background:var(--surface);
+  border-radius:8px;font-size:.94rem;color:var(--ink-soft)}
+.meta b{color:var(--ink)}
+.part{margin:8px 0 14px;padding:12px 16px;background:var(--sea);color:#fff;border-radius:var(--radius)}
+.part h2{margin:0;font-size:1.15rem}
+.part p{margin:3px 0 0;font-size:.92rem;color:#cfe3ea}
+section.task.locked button:disabled{opacity:.9}
+section.task.locked button.chip:disabled{border-style:solid}
+footer.legal{margin-top:26px;font-size:.82rem;color:var(--ink-soft);text-align:center;line-height:1.6}
+
+@media print{
+  header{background:#fff;color:#000;border-bottom:2px solid #000}
+  .book,.sub{color:#333}
+  .footbar,.score,.cover{display:none!important}
+  .meta{background:#fff;border:1px solid #999}
+  .final{display:block!important;break-inside:avoid}
+  .part{background:#fff;color:#000;border:1px solid #999}
+  .part p{color:#333}
+  body{background:#fff;font-size:12pt}
+  section.task{break-inside:avoid;border-color:#999}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <p class="book">Linie 1 Beruf B2 · Kurs- und Übungsbuch</p>
+    <h1>Kapitel 4 – Tourismus</h1>
+    <p class="sub">Ein Durchgang, 50 Punkte – die Auswertung kommt am Ende.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="cover" id="cover">
+    <h2>Kapiteltest und Selbsttest – Kapitel 4</h2>
+    <p class="lead">Bitte lesen Sie die Hinweise und tragen Sie Ihren Namen ein.</p>
+    <ul class="rules">
+      <li>Der Test besteht aus zwei Teilen: Teil A (Kapiteltest, 30 Punkte) und Teil B (Selbsttest, 20 Punkte).</li>
+      <li>Insgesamt gibt es 50 Punkte. Bearbeitungszeit: etwa 30 Minuten.</li>
+      <li>Alle Aufgaben werden angetippt – Sie müssen nichts schreiben.</li>
+      <li>Während des Tests gibt es keine Rückmeldung. Das Ergebnis kommt am Ende.</li>
+      <li>Der Test kann nur einmal abgegeben werden. Danach sind keine Änderungen mehr möglich.</li>
+      <li>Aufgabe 2 in Teil A gehört zum Hörtext 1.41.</li>
+    </ul>
+    <div class="fields">
+      <span class="fld">
+        <label for="f-name">Name</label>
+        <input type="text" id="f-name" autocomplete="name" placeholder="Vor- und Nachname">
+      </span>
+      <span class="fld">
+        <label for="f-kurs">Kurs (optional)</label>
+        <input type="text" id="f-kurs" placeholder="z. B. B2 Abendkurs">
+      </span>
+    </div>
+    <p class="warn" id="warn">Bitte tragen Sie zuerst Ihren Namen ein.</p>
+    <button class="btn" id="start">Test starten</button>
+  </section>
+
+  <div id="testarea" hidden>
+  <div class="meta" id="meta"></div>
+  <div class="score">
+    <span class="points" id="pointsbox"><span id="doneN">0</span> / <span id="totalN">50</span> bearbeitet</span>
+    <span class="bar"><i id="barfill"></i></span>
+    <span class="grade" id="grade">Auswertung nach der Abgabe</span>
+  </div>
+
+  <div class="final" id="final"></div>
+  <div id="tests"></div>
+
+  <div class="footbar" id="footbar">
+    <button class="btn" id="submit">Test abgeben und auswerten</button>
+    <span class="result" id="openhint"></span>
+  </div>
+  <div class="footbar" id="afterbar" hidden>
+    <button class="btn ghost" id="print">Auswertung drucken</button>
+    <button class="btn ghost" id="reset">Neuer Versuch (löscht alles)</button>
+  </div>
+  </div>
+
+  <footer class="legal">
+    Übungsinhalte nach Linie 1 Beruf B2, Ernst Klett Sprachen GmbH, Stuttgart – Vervielfältigung für den eigenen Unterrichtsgebrauch.<br>
+    Interaktive Fassung: Lern Deutsch mit Arash
+  </footer>
+</main>
+
+<script>
+/* =========================================================
+   LÖSUNGSSCHLÜSSEL HÖRVERSTEHEN (Kapiteltest, Aufgabe 2, Track 1.41)
+   Bei Bedarf anpassen: "R" oder "F".
+   ========================================================= */
+var HOER = ["F", "R", "R", "R", "F"];
+
+/* ---------------- Daten ---------------- */
+var KAPITEL = [
+  {
+    n: 1, type: "build", max: 5,
+    title: "Zusammengesetzte Nomen (Komposita) – tippen Sie die Bausteine in der richtigen Reihenfolge an.",
+    hint: "Beispiel: das Camping + der Urlaub = der Campingurlaub. Achtung: Es sind mehr Artikel da, als Sie brauchen.",
+    items: [
+      { cue: "das Hotel + die Anlage", chunks: ["die ", "Hotel", "anlage"], extra: ["der ", "das "], sol: ["die Hotelanlage"] },
+      { cue: "das Fahrrad + die Tour", chunks: ["die ", "Fahrrad", "tour"], extra: ["der ", "das "], sol: ["die Fahrradtour"] },
+      { cue: "pauschal + die Reise", chunks: ["die ", "Pauschal", "reise"], extra: ["der ", "das "], sol: ["die Pauschalreise"] },
+      { cue: "die Reise + die Gruppe", chunks: ["die ", "Reise", "gruppe"], extra: ["der ", "das "], sol: ["die Reisegruppe"] },
+      { cue: "voll + die Pension", chunks: ["die ", "Voll", "pension"], extra: ["der ", "das "], sol: ["die Vollpension"] }
+    ]
+  },
+  {
+    n: 2, type: "rf", max: 5,
+    title: "Hören Sie das Gespräch zwischen Nele und Faris noch einmal. Wählen Sie aus: richtig oder falsch?",
+    hint: "Hörtext 1.41",
+    items: [
+      { t: "Nele hat ihren nächsten Urlaub schon geplant." },
+      { t: "Im letzten Urlaub war sie mit dem Rad unterwegs." },
+      { t: "Dieses Mal will sie keine Individualreise machen." },
+      { t: "Es gibt ein Sonderangebot für eine Schiffsreise, das sie interessant findet." },
+      { t: "Faris empfiehlt Nele eine Hotelanlage an der Ostsee." }
+    ]
+  },
+  {
+    n: 3, type: "build", max: 5,
+    title: "Auf Neles letzter Fahrradtour hat einiges nicht gut geklappt. Was hätte sie anders machen sollen?",
+    hint: "Bauen Sie den Satz: Beispiel: Nele hätte Regenkleidung mitnehmen sollen.",
+    items: [
+      { cue: "das Rad in einer Werkstatt prüfen",
+        chunks: ["Nele ", "hätte ", "das Rad ", "in einer Werkstatt ", "prüfen ", "sollen "],
+        sol: ["Nele hätte das Rad in einer Werkstatt prüfen sollen",
+              "Nele hätte in einer Werkstatt das Rad prüfen sollen"] },
+      { cue: "vor der Reise eine gute Fahrradkarte kaufen",
+        chunks: ["Nele ", "hätte ", "vor der Reise ", "eine gute Fahrradkarte ", "kaufen ", "sollen "],
+        sol: ["Nele hätte vor der Reise eine gute Fahrradkarte kaufen sollen",
+              "Nele hätte eine gute Fahrradkarte vor der Reise kaufen sollen"] },
+      { cue: "nachts immer den Akku ihres Handys aufladen",
+        chunks: ["Nele ", "hätte ", "nachts immer ", "den Akku ihres Handys ", "aufladen ", "sollen "],
+        sol: ["Nele hätte nachts immer den Akku ihres Handys aufladen sollen",
+              "Nele hätte den Akku ihres Handys nachts immer aufladen sollen"] },
+      { cue: "sich nach günstigen Pensionen erkundigen",
+        chunks: ["Nele ", "hätte ", "sich ", "nach günstigen Pensionen ", "erkundigen ", "sollen "],
+        sol: ["Nele hätte sich nach günstigen Pensionen erkundigen sollen"] },
+      { cue: "eine Route mit weniger Bergen aussuchen",
+        chunks: ["Nele ", "hätte ", "eine Route ", "mit weniger Bergen ", "aussuchen ", "sollen "],
+        sol: ["Nele hätte eine Route mit weniger Bergen aussuchen sollen"] }
+    ]
+  },
+  {
+    n: 4, type: "chips", max: 5,
+    title: "Ergänzen Sie die Stellenanzeige.",
+    hint: "Erst eine Lücke antippen, dann das passende Wort. Ein gefülltes Feld noch einmal antippen legt das Wort zurück.",
+    bank: ["Auftreten", "Betreuung", "Kommunikationsfähigkeit", "Qualifikationen", "Vorteil"],
+    sol: ["Betreuung", "Qualifikationen", "Vorteil", "Auftreten", "Kommunikationsfähigkeit"]
+  },
+  {
+    n: 5, type: "choice", max: 5,
+    title: "Welches Verb passt nicht? Tippen Sie es an.",
+    items: [
+      { lbl: "ein Gespräch", opts: ["beginnen", "erwarten", "führen", "reden"], sol: "reden" },
+      { lbl: "einen Flug", opts: ["bezahlen", "buchen", "nachfragen", "stornieren"], sol: "nachfragen" },
+      { lbl: "die Gäste", opts: ["begleiten", "betreuen", "helfen", "unterhalten"], sol: "helfen" },
+      { lbl: "ein Ausflugsprogramm", opts: ["entwickeln", "informieren", "planen", "vorbereiten"], sol: "informieren" },
+      { lbl: "fachliche Qualifikationen", opts: ["ausbilden", "erwarten", "erwerben", "haben"], sol: "ausbilden" }
+    ]
+  },
+  {
+    n: 6, type: "choice", max: 5,
+    title: "Die Konnektoren weil, denn, aus diesem Grund und die Präposition wegen – Was passt?",
+    opts: ["weil", "denn", "aus diesem Grund", "wegen"],
+    items: [
+      { lbl: "… seiner Arabischkenntnisse könnte er auch in Marokko arbeiten.", sol: "wegen" },
+      { lbl: "Ich habe Erfahrungen als Reiseleiterin, … ich schon einige Jahre in diesem Bereich gearbeitet habe.", sol: "weil" },
+      { lbl: "Ich möchte mich beruflich weiterentwickeln, … bewerbe ich mich um die Stelle bei Ihnen.", sol: "aus diesem Grund" },
+      { lbl: "Natürlich kann ich auch die Abrechnungen machen, … bei meiner Ausbildung habe ich das gelernt.", sol: "denn" },
+      { lbl: "… ich gerne mit Menschen arbeite, kann ich mir eine Arbeit im Team gut vorstellen.", sol: "weil" }
+    ]
+  }
+];
+
+var SELBST = [
+  {
+    n: 1, type: "build", max: 5,
+    title: "Wie heißt der Ausdruck? Tippen Sie die Silben in der richtigen Reihenfolge an.",
+    items: [
+      { cue: "Alles, was man als Tourist/in in einer Stadt ansehen sollte, nennt man eine …",
+        chunks: ["Se", "hens", "wür", "dig", "keit"], sol: ["Sehenswürdigkeit"] },
+      { cue: "Ein Hotelzimmer für 2 Personen ist ein …",
+        chunks: ["Dop", "pel", "zim", "mer"], sol: ["Doppelzimmer"] },
+      { cue: "Raki betreut Touristen im Urlaub. Sein Beruf ist …",
+        chunks: ["Rei", "se", "lei", "ter"], sol: ["Reiseleiter"] },
+      { cue: "Wenn in einer Unterkunft Frühstück, Mittagessen und Abendessen inklusive sind, nennt man das …",
+        chunks: ["Voll", "pen", "si", "on"], sol: ["Vollpension"] },
+      { cue: "Eine Reise, die komplett organisiert ist und vorher bezahlt wird, ist eine …",
+        chunks: ["Pau", "schal", "rei", "se"], sol: ["Pauschalreise"] }
+    ]
+  },
+  {
+    n: 2, type: "choice", max: 5,
+    title: "Welcher Konnektor passt?",
+    opts: ["denn", "aufgrund", "weil", "deswegen"],
+    items: [
+      { lbl: "Erec liebt Städtetouren, … er da viele Museen besichtigen kann.", sol: "weil" },
+      { lbl: "Elke hat momentan wenig Geld, … bleibt sie dieses Jahr im Urlaub mal zu Hause.", sol: "deswegen" },
+      { lbl: "… von Renovierungsarbeiten bleibt das Theater leider zwei Wochen geschlossen.", sol: "aufgrund" },
+      { lbl: "Heute soll es den ganzen Tag regnen. … sehen wir uns den Königspalast an.", sol: "deswegen" },
+      { lbl: "Wir haben uns an der Rezeption beschwert, … die Klimaanlage im Zimmer funktioniert nicht.", sol: "denn" }
+    ]
+  },
+  {
+    n: 3, type: "double", max: 5,
+    title: "Konjunktiv II der Vergangenheit – wählen Sie beide Teile aus.",
+    hint: "An deiner Stelle …",
+    items: [
+      { lbl: "… ich mit dem Veranstalter der Reise … (sprechen)",
+        a: ["hätte", "wäre"], b: ["gesprochen", "gesprecht", "sprechen"], sa: "hätte", sb: "gesprochen" },
+      { lbl: "… ich das Hotelzimmer … (wechseln)",
+        a: ["hätte", "wäre"], b: ["gewechselt", "gewechselen", "wechselte"], sa: "hätte", sb: "gewechselt" },
+      { lbl: "… ich noch ein paar Tage länger in Bali … (bleiben)",
+        a: ["hätte", "wäre"], b: ["geblieben", "gebleibt", "blieben"], sa: "wäre", sb: "geblieben" },
+      { lbl: "… ich eine Reiseversicherung … (abschließen)",
+        a: ["hätte", "wäre"], b: ["abgeschlossen", "geabschlossen", "abgeschließt"], sa: "hätte", sb: "abgeschlossen" },
+      { lbl: "… ich mit dem Zug nach Paris … (fahren)",
+        a: ["hätte", "wäre"], b: ["gefahren", "gefahrt", "fuhren"], sa: "wäre", sb: "gefahren" }
+    ]
+  },
+  {
+    n: 4, type: "choice", max: 5,
+    title: "Was passt zusammen? Wählen Sie die passende Endung.",
+    opts: ["ausbildung", "gebiet", "sprachen", "unterlagen", "möglichkeiten"],
+    items: [
+      { lbl: "Einsatz…", sol: "möglichkeiten", full: "Einsatzmöglichkeiten" },
+      { lbl: "Fremd…", sol: "sprachen", full: "Fremdsprachen" },
+      { lbl: "Berufs…", sol: "ausbildung", full: "Berufsausbildung" },
+      { lbl: "Aufgaben…", sol: "gebiet", full: "Aufgabengebiet" },
+      { lbl: "Bewerbungs…", sol: "unterlagen", full: "Bewerbungsunterlagen" }
+    ]
+  }
+];
+
+KAPITEL[1].items.forEach(function (it, i) { it.sol = HOER[i]; });
+
+/* ---------------- Helfer ---------------- */
+function norm(s) {
+  return String(s).toLowerCase().replace(/[.,;:!?"']/g, "").replace(/\s+/g, " ").trim();
+}
+function hit(v, list) {
+  var f = norm(v);
+  if (!f) return false;
+  for (var i = 0; i < list.length; i++) { if (norm(list[i]) === f) return true; }
+  return false;
+}
+function el(tag, cls, txt) {
+  var e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (txt !== undefined) e.textContent = txt;
+  return e;
+}
+function chip(txt) {
+  var b = el("button", "chip", txt);
+  b.type = "button";
+  return b;
+}
+function shuffle(a) {
+  var r = a.slice();
+  for (var i = r.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var t = r[i]; r[i] = r[j]; r[j] = t;
+  }
+  return r;
+}
+function itemBox(num, text) {
+  var box = el("div", "item");
+  var head = el("div", "cue");
+  head.appendChild(el("span", "no-num", num + "."));
+  head.appendChild(el("span", "txt", text));
+  var m = el("span", "mark", "");
+  head.appendChild(m);
+  box.appendChild(head);
+  box.mark = m;
+  return box;
+}
+function showSol(box, text) {
+  var old = box.querySelector(".sol");
+  if (old) old.remove();
+  box.appendChild(el("span", "sol", "Lösung: " + text));
+}
+function clearSol(box) {
+  var old = box.querySelector(".sol");
+  if (old) old.remove();
+}
+
+/* ---------------- Aufgaben bauen ---------------- */
+var STATE = [];
+
+function buildTask(ex, host) {
+  var sec = el("section", "task");
+  var h = el("h2");
+  h.appendChild(el("b", null, ex.n));
+  h.appendChild(el("span", null, ex.title));
+  sec.appendChild(h);
+  if (ex.hint) sec.appendChild(el("p", "hint", ex.hint));
+
+  var body = el("div", "body");
+  var fields = [];
+
+  /* --- Wortsalat / Silbensalat --- */
+  if (ex.type === "build") {
+    ex.items.forEach(function (it, i) {
+      var box = itemBox(i + 1, it.cue);
+      var line = el("div", "line");
+      var ph = el("span", "ph", "Hier erscheint Ihre Lösung");
+      line.appendChild(ph);
+      var bank = el("div", "chips");
+      var pool = (it.chunks || []).concat(it.extra || []);
+      var order = shuffle(pool.map(function (v, k) { return k; }));
+      var picked = [];
+      var btns = [];
+
+      function paint() {
+        line.innerHTML = "";
+        if (!picked.length) { line.appendChild(ph); }
+        picked.forEach(function (id, pos) {
+          var c = chip(pool[id].trim());
+          c.addEventListener("click", function () {
+            picked.splice(pos, 1);
+            btns[id].disabled = false;
+            paint();
+          });
+          line.appendChild(c);
+        });
+        btns.forEach(function (b, id) { b.disabled = picked.indexOf(id) > -1; });
+      }
+      order.forEach(function (id) {
+        var b = chip(pool[id].trim());
+        b.addEventListener("click", function () {
+          if (picked.indexOf(id) > -1) return;
+          picked.push(id);
+          paint();
+        });
+        btns[id] = b;
+        bank.appendChild(b);
+      });
+      box.appendChild(line);
+      box.appendChild(bank);
+      body.appendChild(box);
+
+      fields.push({
+        box: box,
+        text: function () { return picked.map(function (id) { return pool[id]; }).join(""); },
+        answered: function () { return picked.length > 0; },
+        right: function () { return hit(this.text(), it.sol); },
+        label: function () { return it.sol[0]; },
+        set: function () {
+          picked = (it.chunks || []).map(function (v, k) { return k; });
+          paint();
+        },
+        clear: function () { picked = []; paint(); }
+      });
+      paint();
+    });
+  }
+
+  /* --- richtig / falsch --- */
+  if (ex.type === "rf") {
+    ex.items.forEach(function (it, i) {
+      var box = itemBox(i + 1, it.t);
+      var row = el("div", "chips");
+      var choice = { v: "" };
+      var btns = {};
+      [["R", "richtig"], ["F", "falsch"]].forEach(function (p) {
+        var b = chip(p[1]);
+        b.setAttribute("aria-pressed", "false");
+        b.addEventListener("click", function () {
+          choice.v = (choice.v === p[0]) ? "" : p[0];
+          Object.keys(btns).forEach(function (k) {
+            btns[k].setAttribute("aria-pressed", k === choice.v ? "true" : "false");
+          });
+        });
+        btns[p[0]] = b;
+        row.appendChild(b);
+      });
+      box.appendChild(row);
+      body.appendChild(box);
+      fields.push({
+        box: box,
+        answered: function () { return choice.v !== ""; },
+        right: function () { return choice.v === it.sol; },
+        label: function () { return it.sol === "R" ? "richtig" : "falsch"; },
+        set: function () {
+          choice.v = it.sol;
+          Object.keys(btns).forEach(function (k) {
+            btns[k].setAttribute("aria-pressed", k === it.sol ? "true" : "false");
+          });
+        },
+        clear: function () {
+          choice.v = "";
+          Object.keys(btns).forEach(function (k) { btns[k].setAttribute("aria-pressed", "false"); });
+        }
+      });
+    });
+  }
+
+  /* --- eine Auswahl pro Zeile --- */
+  if (ex.type === "choice") {
+    ex.items.forEach(function (it, i) {
+      var box = itemBox(i + 1, it.lbl);
+      var row = el("div", "chips");
+      var opts = it.opts || ex.opts;
+      var choice = { v: "" };
+      var btns = [];
+      opts.forEach(function (o) {
+        var b = chip(o);
+        b.setAttribute("aria-pressed", "false");
+        b.addEventListener("click", function () {
+          choice.v = (choice.v === o) ? "" : o;
+          btns.forEach(function (x) { x.setAttribute("aria-pressed", x.textContent === choice.v ? "true" : "false"); });
+        });
+        btns.push(b);
+        row.appendChild(b);
+      });
+      box.appendChild(row);
+      body.appendChild(box);
+      fields.push({
+        box: box,
+        answered: function () { return choice.v !== ""; },
+        right: function () { return choice.v === it.sol; },
+        label: function () { return it.full || it.sol; },
+        set: function () {
+          choice.v = it.sol;
+          btns.forEach(function (x) { x.setAttribute("aria-pressed", x.textContent === it.sol ? "true" : "false"); });
+        },
+        clear: function () {
+          choice.v = "";
+          btns.forEach(function (x) { x.setAttribute("aria-pressed", "false"); x.classList.remove("solmark"); });
+        }
+      });
+    });
+  }
+
+  /* --- zwei Auswahlen pro Zeile --- */
+  if (ex.type === "double") {
+    ex.items.forEach(function (it, i) {
+      var box = itemBox(i + 1, it.lbl);
+      var wrap2 = el("div", "two");
+      var pick = { a: "", b: "" };
+      var mk = function (key, opts, cap) {
+        var g = el("div", "grp");
+        g.appendChild(el("span", "cap", cap));
+        var row = el("div", "chips");
+        var btns = [];
+        opts.forEach(function (o) {
+          var b = chip(o);
+          b.setAttribute("aria-pressed", "false");
+          b.addEventListener("click", function () {
+            pick[key] = (pick[key] === o) ? "" : o;
+            btns.forEach(function (x) { x.setAttribute("aria-pressed", x.textContent === pick[key] ? "true" : "false"); });
+          });
+          btns.push(b);
+          row.appendChild(b);
+        });
+        g.appendChild(row);
+        wrap2.appendChild(g);
+        return btns;
+      };
+      var btnsA = mk("a", it.a, "Hilfsverb");
+      var btnsB = mk("b", it.b, "Partizip");
+      box.appendChild(wrap2);
+      body.appendChild(box);
+      fields.push({
+        box: box,
+        answered: function () { return pick.a !== "" && pick.b !== ""; },
+        right: function () { return pick.a === it.sa && pick.b === it.sb; },
+        label: function () { return it.sa + " … " + it.sb; },
+        set: function () {
+          pick.a = it.sa; pick.b = it.sb;
+          btnsA.forEach(function (x) { x.setAttribute("aria-pressed", x.textContent === it.sa ? "true" : "false"); });
+          btnsB.forEach(function (x) { x.setAttribute("aria-pressed", x.textContent === it.sb ? "true" : "false"); });
+        },
+        clear: function () {
+          pick.a = ""; pick.b = "";
+          btnsA.concat(btnsB).forEach(function (x) { x.setAttribute("aria-pressed", "false"); });
+        }
+      });
+    });
+  }
+
+  /* --- Wortkasten in Lücken (Stellenanzeige) --- */
+  if (ex.type === "chips") {
+    var assigned = ["", "", "", "", ""];
+    var gaps = [];
+    var bankBtns = {};
+    var active = { i: -1 };
+
+    var bankRow = el("div", "chips");
+    ex.bank.forEach(function (w) {
+      var b = chip(w);
+      b.addEventListener("click", function () {
+        if (b.disabled) return;
+        var target = active.i;
+        if (target < 0 || assigned[target]) {
+          target = assigned.indexOf("");
+        }
+        if (target < 0) return;
+        assigned[target] = w;
+        active.i = -1;
+        paintChips();
+      });
+      bankBtns[w] = b;
+      bankRow.appendChild(b);
+    });
+
+    function paintChips() {
+      gaps.forEach(function (g, i) {
+        g.textContent = assigned[i] || "Lücke " + (i + 1);
+        g.classList.toggle("empty", !assigned[i]);
+        g.setAttribute("aria-pressed", active.i === i ? "true" : "false");
+      });
+      ex.bank.forEach(function (w) { bankBtns[w].disabled = assigned.indexOf(w) > -1; });
+    }
+    function mkGap(i) {
+      var g = el("button", "gap empty", "Lücke " + (i + 1));
+      g.type = "button";
+      g.addEventListener("click", function () {
+        if (assigned[i]) { assigned[i] = ""; active.i = i; }
+        else { active.i = (active.i === i) ? -1 : i; }
+        paintChips();
+      });
+      gaps[i] = g;
+      return g;
+    }
+
+    var ad = el("div", "ad");
+    ad.appendChild(el("h3", null, "Wir suchen Reiseleiter/innen"));
+    ad.appendChild(el("p", "head", "Ihr Aufgabengebiet"));
+    var u1 = el("ul");
+    var l1 = el("li");
+    l1.appendChild(el("span", null, "Empfang und "));
+    l1.appendChild(mkGap(0));
+    l1.appendChild(el("span", null, " unserer Gäste"));
+    u1.appendChild(l1);
+    u1.appendChild(el("li", null, "Administrative Aufgaben (Ausflugsabrechnung, Ablage)"));
+    ad.appendChild(u1);
+
+    ad.appendChild(el("p", "head", "Wir erwarten von Ihnen"));
+    var u2 = el("ul");
+    var l2 = el("li");
+    l2.appendChild(el("span", null, "fachliche "));
+    l2.appendChild(mkGap(1));
+    l2.appendChild(el("span", null, " inkl. Computerkenntnisse"));
+    u2.appendChild(l2);
+    u2.appendChild(el("li", null, "abgeschlossene Berufsausbildung im kaufmännischen Bereich"));
+    var l3 = el("li");
+    l3.appendChild(el("span", null, "eine touristische Ausbildung (Hotel, Reiseverkehr etc.) wäre von "));
+    l3.appendChild(mkGap(2));
+    u2.appendChild(l3);
+    ad.appendChild(u2);
+
+    ad.appendChild(el("p", "head", "persönliche Anforderungen"));
+    var u3 = el("ul");
+    var l4 = el("li");
+    l4.appendChild(el("span", null, "Serviceorientierung: höfliches "));
+    l4.appendChild(mkGap(3));
+    l4.appendChild(el("span", null, ", ansprechende Erscheinung"));
+    u3.appendChild(l4);
+    var l5 = el("li");
+    l5.appendChild(el("span", null, "Team- und "));
+    l5.appendChild(mkGap(4));
+    u3.appendChild(l5);
+    ad.appendChild(u3);
+
+    body.appendChild(bankRow);
+    body.appendChild(ad);
+    paintChips();
+
+    ex.sol.forEach(function (s, i) {
+      fields.push({
+        box: null, gap: gaps[i],
+        answered: function () { return assigned[i] !== ""; },
+        right: function () { return assigned[i] === s; },
+        label: function () { return s; },
+        set: function () { assigned[i] = s; paintChips(); },
+        clear: function () { assigned[i] = ""; paintChips(); },
+        paint: function (good, showAnswer) {
+          gaps[i].classList.remove("ok", "no");
+          var old = gaps[i].nextSibling;
+          if (old && old.className === "gapsol") old.remove();
+          if (good === null) return;
+          gaps[i].classList.add(good ? "ok" : "no");
+          if (!good && showAnswer) {
+            var s2 = el("span", "gapsol", "→ " + s);
+            gaps[i].parentNode.insertBefore(s2, gaps[i].nextSibling);
+          }
+        }
+      });
+    });
+  }
+
+  sec.appendChild(body);
+  host.appendChild(sec);
+
+  function mark(f, good, withAnswer) {
+    if (f.paint) { f.paint(good, withAnswer); return; }
+    f.box.classList.remove("ok", "no");
+    clearSol(f.box);
+    if (good === null) { f.box.mark.textContent = ""; return; }
+    f.box.classList.add(good ? "ok" : "no");
+    f.box.mark.textContent = good ? "\u2713" : "\u2717";
+    if (!good && withAnswer) showSol(f.box, f.label());
+  }
+
+  var st = {
+    ex: ex, score: 0,
+    open: function () {
+      var n = 0;
+      fields.forEach(function (f) { if (!f.answered()) n++; });
+      return n;
+    },
+    grade: function () {
+      var p = 0;
+      fields.forEach(function (f) {
+        var good = f.right();
+        if (good) p++;
+        mark(f, good, true);
+      });
+      st.score = p;
+      return p;
+    },
+    lock: function () {
+      sec.querySelectorAll("button").forEach(function (b) { b.disabled = true; });
+      sec.classList.add("locked");
+    },
+    reset: function () {
+      sec.querySelectorAll("button").forEach(function (b) { b.disabled = false; });
+      sec.classList.remove("locked");
+      fields.forEach(function (f) { f.clear(); mark(f, null, false); });
+      st.score = 0;
+    }
+  };
+  STATE.push(st);
+  return st;
+}
+
+/* ---------------- Rendern ---------------- */
+var host = document.getElementById("tests");
+
+function partHead(title, sub) {
+  var p = el("div", "part");
+  p.appendChild(el("h2", null, title));
+  p.appendChild(el("p", null, sub));
+  host.appendChild(p);
+}
+
+partHead("Teil A \u2013 Kapiteltest", "Aufgaben 1 bis 6 \u00b7 30 Punkte");
+var groupA = KAPITEL.map(function (ex) { return buildTask(ex, host); });
+partHead("Teil B \u2013 Selbsttest", "Aufgaben 1 bis 4 \u00b7 20 Punkte");
+var groupB = SELBST.map(function (ex) { return buildTask(ex, host); });
+var ALL = groupA.concat(groupB);
+
+var TOTAL = 0;
+ALL.forEach(function (s) { TOTAL += s.ex.max; });
+
+/* ---------------- Fortschritt ---------------- */
+var elBar = document.getElementById("barfill"),
+    elGrade = document.getElementById("grade"),
+    elFinal = document.getElementById("final"),
+    elHint = document.getElementById("openhint"),
+    elPointsBox = document.getElementById("pointsbox"),
+    footbar = document.getElementById("footbar"),
+    afterbar = document.getElementById("afterbar");
+
+var submitted = false;
+
+function openCount() {
+  var n = 0;
+  ALL.forEach(function (s) { n += s.open(); });
+  return n;
+}
+function progress() {
+  if (submitted) return;
+  var open = openCount();
+  var done = TOTAL - open;
+  elPointsBox.innerHTML = "<span>" + done + "</span> / " + TOTAL + " bearbeitet";
+  elBar.style.width = Math.round(done / TOTAL * 100) + "%";
+  elHint.textContent = open ? "Noch offen: " + open : "Alle Aufgaben bearbeitet";
+  elGrade.textContent = open ? "Auswertung nach der Abgabe" : "Bereit zur Abgabe";
+}
+host.addEventListener("click", progress);
+
+/* ---------------- Abgabe ---------------- */
+function evaluate() {
+  var pts = 0;
+  ALL.forEach(function (s) { pts += s.grade(); s.lock(); });
+  submitted = true;
+  footbar.hidden = true;
+  afterbar.hidden = false;
+
+  var q = pts / TOTAL;
+  var txt = q >= 0.9 ? "Sehr gut" : q >= 0.8 ? "Gut" : q >= 0.65 ? "Befriedigend" : q >= 0.5 ? "Ausreichend" : "Nicht bestanden";
+  var a = 0, b = 0;
+  groupA.forEach(function (s) { a += s.score; });
+  groupB.forEach(function (s) { b += s.score; });
+
+  elPointsBox.innerHTML = "<span>" + pts + "</span> / " + TOTAL + " Punkte";
+  elBar.style.width = Math.round(q * 100) + "%";
+  elGrade.textContent = txt;
+
+  var zeit = dauer();
+  paintMeta(zeit);
+
+  elFinal.className = "final on";
+  elFinal.innerHTML = "";
+  elFinal.appendChild(el("p", null, TN.name + (TN.kurs ? " \u00b7 " + TN.kurs : "") + " \u00b7 " + TN.datum + " \u00b7 " + zeit));
+  elFinal.appendChild(el("p", "big", pts + " von " + TOTAL + " Punkten \u00b7 " + Math.round(q * 100) + " %"));
+  elFinal.appendChild(el("p", null, "Ergebnis: " + txt));
+
+  var tbl = el("table");
+  function line(label, val, cls) {
+    var tr = el("tr", cls);
+    tr.appendChild(el("td", null, label));
+    tr.appendChild(el("td", null, val));
+    tbl.appendChild(tr);
+  }
+  groupA.forEach(function (s) { line("Teil A \u00b7 Aufgabe " + s.ex.n, s.score + " / " + s.ex.max); });
+  line("Teil A gesamt", a + " / 30");
+  groupB.forEach(function (s) { line("Teil B \u00b7 Aufgabe " + s.ex.n, s.score + " / " + s.ex.max); });
+  line("Teil B gesamt", b + " / 20");
+  line("Gesamtergebnis", pts + " / " + TOTAL, "sum");
+  elFinal.appendChild(tbl);
+
+  var weak = groupA.filter(function (s) { return s.score < s.ex.max; }).map(function (s) { return "A" + s.ex.n; })
+    .concat(groupB.filter(function (s) { return s.score < s.ex.max; }).map(function (s) { return "B" + s.ex.n; }));
+  elFinal.appendChild(el("p", "note", weak.length
+    ? "Noch einmal ansehen: Aufgabe " + weak.join(", ") + ". Die richtigen L\u00f6sungen stehen unten bei den Aufgaben."
+    : "Alles richtig \u2013 nichts muss nachgearbeitet werden."));
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+document.getElementById("submit").addEventListener("click", function () {
+  var open = openCount();
+  var frage = open > 0
+    ? "Es sind noch " + open + " Aufgabenteile ohne Antwort. Der Test kann nur einmal abgegeben werden. Jetzt trotzdem abgeben?"
+    : "Test jetzt abgeben? Danach sind keine \u00c4nderungen mehr m\u00f6glich.";
+  if (!window.confirm(frage)) return;
+  evaluate();
+});
+
+document.getElementById("reset").addEventListener("click", function () {
+  if (!window.confirm("Wirklich neu starten? Alle Antworten und das Ergebnis werden gel\u00f6scht.")) return;
+  ALL.forEach(function (s) { s.reset(); });
+  submitted = false;
+  elFinal.className = "final";
+  elFinal.innerHTML = "";
+  footbar.hidden = false;
+  afterbar.hidden = true;
+  testarea.hidden = true;
+  cover.hidden = false;
+  fName.value = "";
+  fKurs.value = "";
+  progress();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});
+
+document.getElementById("print").addEventListener("click", function () { window.print(); });
+
+/* ---------------- Deckblatt ---------------- */
+var cover = document.getElementById("cover"),
+    testarea = document.getElementById("testarea"),
+    fName = document.getElementById("f-name"),
+    fKurs = document.getElementById("f-kurs"),
+    warn = document.getElementById("warn"),
+    elMeta = document.getElementById("meta");
+
+var TN = { name: "", kurs: "", datum: "", start: 0 };
+
+function zwei(n) { return (n < 10 ? "0" : "") + n; }
+function dauer() {
+  var s = Math.round((Date.now() - TN.start) / 1000);
+  return Math.floor(s / 60) + ":" + zwei(s % 60) + " Min.";
+}
+function paintMeta(extra) {
+  elMeta.innerHTML = "";
+  var parts = [["Name", TN.name]];
+  if (TN.kurs) parts.push(["Kurs", TN.kurs]);
+  parts.push(["Datum", TN.datum]);
+  if (extra) parts.push(["Dauer", extra]);
+  parts.forEach(function (p) {
+    var s = el("span");
+    s.appendChild(document.createTextNode(p[0] + ": "));
+    s.appendChild(el("b", null, p[1]));
+    elMeta.appendChild(s);
+  });
+}
+
+function startTest() {
+  var n = fName.value.trim();
+  if (n.length < 2) {
+    warn.className = "warn on";
+    fName.focus();
+    return;
+  }
+  TN.name = n;
+  TN.kurs = fKurs.value.trim();
+  TN.datum = new Date().toLocaleDateString("de-DE");
+  TN.start = Date.now();
+  paintMeta("");
+  cover.hidden = true;
+  testarea.hidden = false;
+  progress();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+document.getElementById("start").addEventListener("click", startTest);
+fName.addEventListener("input", function () { warn.className = "warn"; });
+[fName, fKurs].forEach(function (f) {
+  f.addEventListener("keydown", function (e) { if (e.key === "Enter") startTest(); });
+});
+
+progress();
+</script>
+</body>
+</html>
