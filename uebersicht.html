@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ergebnisübersicht</title>
+<link rel="stylesheet" href="style.css">
+<script data-goatcounter="https://aguitoo.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+<body>
+<header class="top"><div class="brand">Deutschtest <small>Ergebnisübersicht</small></div><div class="grow"></div><a class="pill" href="./" style="color:#fff;text-decoration:none">Zur Testauswahl</a></header>
+<main class="wrap" id="app"><p class="muted">Wird geladen …</p></main>
+<script type="module">
+import { DB, DEMO } from './db.js';
+import { esc } from './engine.js';
+const app = document.querySelector('#app');
+const TID = new URLSearchParams(location.search).get('t');
+const banner = DEMO ? `<div class="banner"><b>Demo-Modus:</b> Daten nur aus diesem Browser.</div>` : '';
+
+if (!TID) {
+  const list = await DB.listTests(['open', 'closed']);
+  app.innerHTML = banner + `<h1>Ergebnisübersichten</h1>` + (list.length ? list.map(t => `<div class="card row" style="justify-content:space-between">
+    <div><b>${esc(t.title)}</b><div class="muted small">${esc(t.level || '')}</div></div><a class="btn ghost" href="?t=${encodeURIComponent(t.id)}">Ansehen</a></div>`).join('') : '<div class="card">Noch keine Tests.</div>');
+} else {
+  const s = await DB.getSummary(TID);
+  if (!s) app.innerHTML = banner + `<div class="card"><h2>Noch keine Übersicht</h2><p>Für diesen Test liegen noch keine Ergebnisse vor.</p></div>`;
+  else render(s);
+}
+
+function render(s) {
+  const maxH = Math.max(...s.hist, 1);
+  app.innerHTML = banner + `<h1>${esc(s.title)}</h1><p class="muted">Anonyme Zusammenfassung · Stand ${new Date(s.updatedAt).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+    <div class="kpis">
+      <div class="kpi"><div class="v">${s.n}</div><div class="l">Teilnehmende</div></div>
+      <div class="kpi"><div class="v">${s.mean} %</div><div class="l">Durchschnitt</div></div>
+      <div class="kpi"><div class="v">${s.median} %</div><div class="l">Median</div></div>
+      <div class="kpi"><div class="v">${s.passRate} %</div><div class="l">bestanden (ab ${s.passPercent} %)</div></div>
+    </div>
+    ${s.n ? `<div class="card"><h2>Verteilung</h2>
+      <div class="hist">${s.hist.map((h, i) => `<div class="${(i + 1) * 10 <= s.passPercent ? 'fail' : ''}" style="height:${100 * h / maxH}%"><span>${h || ''}</span></div>`).join('')}</div>
+      <div class="hlabels">${s.hist.map((_, i) => `<span>${i * 10}–${i === 9 ? 100 : i * 10 + 9}</span>`).join('')}</div>
+      <p class="small muted">Anzahl Teilnehmende nach erreichten Prozent.</p></div>
+    <div class="card"><h2>Abschnitte</h2>${s.sections.map(x => `<div class="hbar"><span>${esc(x.title)}</span><div class="t"><i style="width:${x.mean}%"></i></div><span class="n">${x.mean} %</span></div>`).join('')}
+      <p class="small muted">Durchschnitt aller Teilnehmenden.</p></div>` : ''}
+    <div class="card"><h2>Mein Ergebnis</h2>
+      ${s.published ? `<p>Gib deinen persönlichen Code ein:</p>
+        <div class="row"><input type="text" id="code" maxlength="10" autocomplete="off" autocapitalize="characters" style="max-width:220px;text-transform:uppercase;letter-spacing:.15em;font-weight:700"><button class="btn" id="look">Anzeigen</button></div><div id="res" style="margin-top:14px"></div>`
+      : `<p class="muted">Die Einzelergebnisse sind noch nicht freigegeben. Bitte später noch einmal hereinschauen.</p>`}</div>`;
+  if (!s.published) return;
+  const look = () => {
+    const c = document.querySelector('#code').value.trim().toUpperCase(), r = s.codes?.[c], out = document.querySelector('#res');
+    if (!r) { out.innerHTML = `<p class="err">Zu diesem Code gibt es kein Ergebnis. Bitte prüfe die Schreibweise.</p>`; return; }
+    out.innerHTML = `<div class="${r.passed ? 'okbox' : 'banner'}" style="font-size:1.1rem"><b>${r.pts} von ${r.max} Punkten (${r.pct} %)</b> – ${r.passed ? 'bestanden' : 'nicht bestanden'}</div>` +
+      r.sections.map(x => { const p = x.max ? Math.round(100 * x.pts / x.max) : 0; return `<div class="hbar"><span>${esc(x.title)}</span><div class="t"><i style="width:${p}%"></i></div><span class="n">${x.pts}/${x.max}</span></div>`; }).join('');
+  };
+  document.querySelector('#look').onclick = look;
+  document.querySelector('#code').onkeydown = e => { if (e.key === 'Enter') look(); };
+}
+</script>
+</body>
+</html>

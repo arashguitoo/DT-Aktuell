@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Testkonsole</title>
+<link rel="stylesheet" href="style.css">
+<script data-goatcounter="https://aguitoo.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+<style>
+  .layout { display: grid; grid-template-columns: 280px 1fr; gap: 20px; align-items: start; }
+  .side .tcard { display: block; width: 100%; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; cursor: pointer; }
+  .side .tcard.on { border-color: var(--navy); box-shadow: 0 0 0 2px var(--navy) inset; }
+  .side .tcard b { display: block; }
+  .tabs { display: flex; gap: 4px; border-bottom: 2px solid var(--line); margin-bottom: 18px; flex-wrap: wrap; }
+  .tabs button { border: 0; background: none; padding: 10px 14px; cursor: pointer; font-weight: 600; color: var(--muted); border-bottom: 3px solid transparent; margin-bottom: -2px; }
+  .tabs button.on { color: var(--navy); border-color: var(--navy); }
+  .modal { position: fixed; inset: 0; background: rgba(15,25,40,.45); display: flex; align-items: flex-start; justify-content: center; padding: 30px 12px; z-index: 50; overflow-y: auto; }
+  .modal .card { width: min(900px, 100%); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .flag { font-size: .78rem; border-radius: 6px; padding: 1px 6px; background: var(--warn-soft); color: var(--warn); font-weight: 700; white-space: nowrap; }
+  .linkbox { font-family: ui-monospace, Menlo, monospace; font-size: .85rem; background: #eef2f7; border-radius: 8px; padding: 6px 10px; word-break: break-all; flex: 1; }
+  @media (max-width: 860px) { .layout, .grid2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">Testkonsole <small>Deutschtest</small></div>
+  <div class="grow"></div>
+  <span id="who" class="pill" hidden></span>
+  <button id="logout" class="btn ghost sm" style="color:#fff;border-color:rgba(255,255,255,.5)" hidden>Abmelden</button>
+</header>
+<main class="wrap wide" id="app"><p class="muted">Wird geladen …</p></main>
+<div id="modal"></div>
+
+<script type="module">
+import { DB, DEMO } from './db.js';
+import { esc, fmt, splitTest, mergeTest, grade, itemsOf, optionsFor, answerText, label, TYPE_LABEL, isTextType, pct } from './engine.js';
+
+const $ = s => document.querySelector(s);
+const app = $('#app');
+let tests = [], cur = null, curContent = null, curKey = null, subs = [], stats = null, unsub = null, tab = 'overview', detail = null;
+let lastSummary = '', sumTimer = null;
+const STATUS = { draft: 'Entwurf', open: 'Offen', closed: 'Geschlossen' };
+const badge = st => `<span class="badge b-${st}">${STATUS[st] || st}</span>`;
+const base = location.href.replace(/konsole\.html.*$/, '');
+
+DB.onAdmin(async (admin, user) => {
+  if (!admin) {
+    $('#who').hidden = !user; $('#who').textContent = user ? (user.email || 'anonym') + ' – kein Zugriff' : '';
+    $('#logout').hidden = !user;
+    app.innerHTML = `<div class="card" style="max-width:520px;margin:40px auto;text-align:center">
+      <h1>Testkonsole</h1><p class="muted">Nur für den Testmacher. Bitte mit dem berechtigten Google-Konto anmelden.</p>
+      <button class="btn" id="login">Mit Google anmelden</button><div id="lerr"></div></div>`;
+    $('#login').onclick = () => DB.login().catch(e => $('#lerr').innerHTML = `<p class="err">${esc(e.message)}</p>`);
+    return;
+  }
+  $('#who').hidden = false; $('#who').textContent = admin.email; $('#logout').hidden = DEMO;
+  await refreshTests();
+});
+$('#logout').onclick = () => DB.logout();
+
+async function refreshTests(selectId) {
+  tests = (await DB.allTests()).sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+  const id = selectId || cur?.id || tests[0]?.id;
+  renderShell();
+  if (id && tests.find(t => t.id === id)) selectTest(id); else $('#main').innerHTML = emptyMain();
+}
+
+function renderShell() {
+  app.innerHTML = (DEMO ? `<div class="banner"><b>Demo-Modus:</b> Firebase ist noch nicht in <code>config.js</code> eingetragen. Alles wird nur in diesem Browser gespeichert – zum Ausprobieren ideal.</div>` : '') +
+    `<div class="layout"><aside class="side">
+      <button class="btn teal" id="imp" style="width:100%;margin-bottom:14px">+ Test importieren</button>
+      ${tests.map(t => `<button class="tcard ${cur?.id === t.id ? 'on' : ''}" data-id="${esc(t.id)}"><b>${esc(t.title)}</b>
+        <span class="small muted">${esc(t.id)}</span><br>${badge(t.status)} <span class="small muted">${t.itemCount || 0} Aufgaben</span></button>`).join('')}
+      <p class="small muted" style="margin-top:14px"><a href="./" target="_blank">Testseite öffnen</a> · <a href="uebersicht.html" target="_blank">Übersichten</a></p>
+    </aside><section id="main"></section></div>`;
+  $('#imp').onclick = () => openImport();
+  document.querySelectorAll('.tcard').forEach(b => b.onclick = () => selectTest(b.dataset.id));
+}
+const emptyMain = () => `<div class="card"><h2>Noch kein Test</h2><p>Importiere eine Testdatei (JSON). Für den Anfang: „+ Test importieren“ → „Beispieltest laden“.</p></div>`;
+
+async function selectTest(id) {
+  if (unsub) { unsub(); unsub = null; }
+  cur = tests.find(t => t.id === id); detail = null; lastSummary = '';
+  document.querySelectorAll('.tcard').forEach(b => b.classList.toggle('on', b.dataset.id === id));
+  curContent = JSON.parse(cur.content);
+  curKey = await DB.getKey(id);
+  subs = [];
+  unsub = await DB.watchSubs(id, list => { subs = list.sort((a, b) => a.submittedAt - b.submittedAt); recompute(); render(); });
+  recompute(); render();
+}
+
+// ---------- Statistik ----------
+const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+const median = a => { if (!a.length) return 0; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+const sd = a => { if (a.length < 2) return 0; const m = mean(a); return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / (a.length - 1)); };
+function corr(x, y) {
+  const n = x.length; if (n < 3) return null;
+  const mx = mean(x), my = mean(y); let sxy = 0, sxx = 0, syy = 0;
+  for (let i = 0; i < n; i++) { sxy += (x[i] - mx) * (y[i] - my); sxx += (x[i] - mx) ** 2; syy += (y[i] - my) ** 2; }
+  return sxx && syy ? sxy / Math.sqrt(sxx * syy) : null;
+}
+const r1 = x => Math.round(x * 10) / 10;
+
+function recompute() {
+  const pass = cur.passPercent ?? 60;
+  const graded = subs.map(s => { let ans = {}; try { ans = JSON.parse(s.answers || '{}'); } catch { } return { ...s, ans, g: grade(curContent, curKey, ans) }; });
+  const pcts = graded.map(x => x.g.pct);
+  const hist = Array(10).fill(0); pcts.forEach(p => hist[Math.min(9, Math.floor(p / 10))]++);
+  const secTitles = [];
+  graded.forEach(x => x.g.sections.forEach(s => { if (!secTitles.includes(s.title)) secTitles.push(s.title); }));
+  if (!graded.length) grade(curContent, curKey, {}).sections.forEach(s => secTitles.push(s.title));
+  const sections = secTitles.map(t => ({ title: t, mean: r1(mean(graded.map(x => x.g.sections.find(s => s.title === t)?.pct ?? 0))) }));
+  const totals = graded.map(x => x.g.pts);
+  const items = itemsOf(curContent).map(({ gid, s, p, it }) => {
+    const vals = graded.map(x => x.g.items[gid]);
+    const okArr = vals.map(v => v?.ok ? 1 : 0);
+    const rest = graded.map((x, i) => x.g.pts - (vals[i]?.pts || 0));
+    const dist = {};
+    vals.forEach(v => { const k = v?.given == null || v.given === '' ? '–' : String(v.given); dist[k] = (dist[k] || 0) + 1; });
+    const p_ = graded.length ? okArr.reduce((a, b) => a + b, 0) / graded.length : null;
+    const disc = corr(okArr, rest);
+    const flags = [];
+    if (graded.length >= 5) {
+      if (p_ < .3) flags.push('sehr schwer'); if (p_ > .9) flags.push('sehr leicht');
+      if (disc != null && disc < .2) flags.push('trennt schlecht');
+      if (!isTextType(it.type) && it.type !== 'truefalse') {
+        const unused = optionsFor(p, it).filter(o => !dist[o.k] && o.k !== curKey[gid]);
+        if (it.type === 'choice' && unused.length) flags.push('Distraktor ungenutzt');
+      }
+    }
+    return { gid, s, p, it, p_: p_, disc, dist, flags, blank: dist['–'] || 0 };
+  });
+  stats = {
+    pass, graded, n: graded.length, pcts, hist, sections, items,
+    mean: r1(mean(pcts)), median: r1(median(pcts)), sd: r1(sd(pcts)),
+    min: graded.length ? Math.min(...pcts) : 0, max: graded.length ? Math.max(...pcts) : 0,
+    passRate: graded.length ? r1(100 * pcts.filter(p => p >= pass).length / graded.length) : 0,
+    dur: Math.round(mean(graded.map(x => x.durationSec || 0)) / 60),
+    alpha: cronbach(graded, items),
+  };
+  scheduleSummary();
+}
+function cronbach(graded, items) {
+  const k = items.length, n = graded.length; if (k < 2 || n < 3) return null;
+  const itemVar = items.reduce((s, it) => { const v = graded.map(x => x.g.items[it.gid]?.pts || 0); return s + sd(v) ** 2; }, 0);
+  const tv = sd(graded.map(x => x.g.pts)) ** 2; if (!tv) return null;
+  return Math.round(100 * (k / (k - 1)) * (1 - itemVar / tv)) / 100;
+}
+
+// Öffentliche, anonyme Zusammenfassung (für uebersicht.html)
+function scheduleSummary() {
+  clearTimeout(sumTimer);
+  sumTimer = setTimeout(async () => {
+    const s = stats;
+    const obj = {
+      title: cur.title, level: cur.level || '', n: s.n, mean: s.mean, median: s.median, passRate: s.passRate, passPercent: s.pass,
+      hist: s.hist, sections: s.sections, max: s.graded[0]?.g.max ?? cur.maxPoints ?? 0, published: !!cur.publishResults,
+    };
+    if (cur.publishResults) obj.codes = Object.fromEntries(s.graded.map(x => [x.code, {
+      pts: x.g.pts, max: x.g.max, pct: x.g.pct, passed: x.g.pct >= s.pass, sections: x.g.sections.map(z => ({ title: z.title, pts: z.pts, max: z.max })),
+    }]));
+    const sig = JSON.stringify(obj);
+    if (sig === lastSummary) return;
+    try { await DB.saveSummary(cur.id, { ...obj, updatedAt: Date.now() }); lastSummary = sig; } catch (e) { console.error(e); }
+  }, 1200);
+}
+
+// ---------- Darstellung ----------
+function render() {
+  const t = cur;
+  const tabs = [['overview', 'Überblick'], ['items', 'Aufgabenanalyse'], ['subs', `Teilnahmen (${stats.n})`], ['settings', 'Einstellungen']];
+  $('#main').innerHTML = `<div class="row" style="justify-content:space-between;margin-bottom:6px">
+      <div><h1 style="margin:0">${esc(t.title)}</h1><div class="muted">${esc(t.id)} · ${badge(t.status)} · ${t.itemCount || 0} Aufgaben · ${t.maxPoints || 0} Punkte</div></div>
+      <div class="row">${statusButtons(t)}</div></div>
+    <div class="tabs">${tabs.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div id="tabBody"></div>`;
+  document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { tab = b.dataset.tab; render(); });
+  document.querySelectorAll('[data-status]').forEach(b => b.onclick = () => setStatus(b.dataset.status));
+  ({ overview: tOverview, items: tItems, subs: tSubs, settings: tSettings })[tab]();
+}
+function statusButtons(t) {
+  if (t.status === 'open') return `<button class="btn ghost" data-status="closed">Test schließen</button>`;
+  return `<button class="btn teal" data-status="open">Test öffnen</button>`;
+}
+async function setStatus(st) {
+  if (st === 'open' && !(cur.itemCount > 0)) return alert('Der Test hat noch keine Aufgaben.');
+  await DB.updateTest(cur.id, { status: st }); cur.status = st;
+  tests.find(x => x.id === cur.id).status = st; renderShell(); document.querySelector(`.tcard[data-id="${cur.id}"]`)?.classList.add('on'); render();
+}
+
+function tOverview() {
+  const s = stats, b = $('#tabBody');
+  if (!s.n) {
+    b.innerHTML = `<div class="card"><h2>Noch keine Abgaben</h2><p>Sobald Teilnehmende abgeben, erscheinen hier die Statistiken – live, ohne Neuladen.</p>
+      <p class="muted">Status: ${badge(cur.status)} ${cur.status !== 'open' ? '– Teilnehmende können erst abgeben, wenn der Test <b>offen</b> ist.' : ''}</p>${contentOverview()}</div>`;
+    return;
+  }
+  const maxH = Math.max(...s.hist, 1);
+  b.innerHTML = `<div class="kpis">
+      <div class="kpi"><div class="v">${s.n}</div><div class="l">Abgaben</div></div>
+      <div class="kpi"><div class="v">${s.mean} %</div><div class="l">Durchschnitt (SD ${s.sd})</div></div>
+      <div class="kpi"><div class="v">${s.median} %</div><div class="l">Median</div></div>
+      <div class="kpi"><div class="v">${s.passRate} %</div><div class="l">bestanden (≥ ${s.pass} %)</div></div>
+      <div class="kpi"><div class="v">${s.min}–${s.max}</div><div class="l">Spannweite in %</div></div>
+      <div class="kpi"><div class="v">${s.dur} min</div><div class="l">Ø Bearbeitungszeit</div></div>
+      <div class="kpi"><div class="v">${s.alpha ?? '–'}</div><div class="l">Cronbachs α (Zuverlässigkeit)</div></div>
+    </div>
+    <div class="grid2">
+      <div class="card"><h2>Verteilung der Ergebnisse</h2>
+        <div class="hist">${s.hist.map((h, i) => `<div class="${(i + 1) * 10 <= s.pass ? 'fail' : ''}" style="height:${100 * h / maxH}%"><span>${h || ''}</span></div>`).join('')}</div>
+        <div class="hlabels">${s.hist.map((_, i) => `<span>${i * 10}–${i === 9 ? 100 : i * 10 + 9}</span>`).join('')}</div>
+        <p class="small muted">Prozent der Punkte · graue Balken liegen unter der Bestehensgrenze.</p></div>
+      <div class="card"><h2>Abschnitte (Ø in %)</h2>
+        ${s.sections.map(x => `<div class="hbar"><span>${esc(x.title)}</span><div class="t"><i style="width:${x.mean}%"></i></div><span class="n">${x.mean} %</span></div>`).join('')}
+        <h3 style="margin-top:18px">Auffällige Aufgaben</h3>
+        ${s.items.filter(i => i.flags.length).slice(0, 8).map(i => `<div class="small">${esc(i.s.title)} › ${esc(i.p.title || i.p.id)} › <b>${esc(label(i.it))}</b> – ${i.flags.map(f => `<span class="flag">${f}</span>`).join(' ')}</div>`).join('') || '<p class="small muted">Keine (ab 5 Abgaben aussagekräftig).</p>'}
+      </div></div>
+    <p class="small muted">Die anonyme <a href="uebersicht.html?t=${encodeURIComponent(cur.id)}" target="_blank">Ergebnisübersicht</a> wird automatisch aktualisiert, solange diese Konsole geöffnet ist.</p>`;
+}
+
+function contentOverview() {
+  return `<h3 style="margin-top:16px">Inhalt</h3><table class="tbl"><thead><tr><th>Abschnitt</th><th>Teile</th><th>Aufgaben</th></tr></thead><tbody>` +
+    curContent.sections.map(s => { const n = (s.parts || []).reduce((a, p) => a + (p.items || []).length, 0);
+      return `<tr><td>${esc(s.title)}</td><td>${(s.parts || []).map(p => esc(p.title || p.id)).join('<br>') || '<span class="flag">noch leer</span>'}</td><td>${n}</td></tr>`; }).join('') + '</tbody></table>';
+}
+
+function tItems() {
+  const s = stats, onlyFlag = tItems.only;
+  const rows = s.items.filter(i => !onlyFlag || i.flags.length).map(i => {
+    const pv = i.p_ == null ? '–' : Math.round(100 * i.p_) + ' %';
+    const pc = i.p_ == null ? '' : i.p_ < .3 ? 'badv' : i.p_ > .9 ? 'mid' : 'good';
+    const dc = i.disc == null ? '–' : i.disc.toFixed(2);
+    const dcls = i.disc == null ? '' : i.disc < .2 ? 'badv' : i.disc < .3 ? 'mid' : 'good';
+    const k = curKey[i.gid];
+    let distHtml;
+    if (isTextType(i.it.type)) {
+      distHtml = Object.entries(i.dist).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([v, c]) =>
+        `<span class="chip ${grade(curContent, curKey, { [i.gid]: v }).items[i.gid].ok ? 'key' : ''}">${esc(v.length > 40 ? v.slice(0, 40) + '…' : v)} ${c}</span>`).join('');
+    } else {
+      const keys = Array.isArray(k) ? k : [k];
+      distHtml = optionsFor(i.p, i.it).map(o => `<span class="chip ${keys.includes(o.k) ? 'key' : ''}" title="${esc(o.t)}">${esc(o.k)} ${i.dist[o.k] || 0}</span>`).join('') + (i.blank ? `<span class="chip">– ${i.blank}</span>` : '');
+    }
+    return `<tr><td>${esc(i.s.title)}</td><td>${esc(i.p.title || i.p.id)}</td><td><b>${esc(label(i.it))}</b></td><td>${TYPE_LABEL[i.it.type]}</td>
+      <td>${esc(answerText(i.p, i.it, k))}</td><td class="${pc}">${pv}</td><td class="${dcls}">${dc}</td><td>${distHtml}</td><td>${i.flags.map(f => `<span class="flag">${f}</span>`).join(' ')}</td></tr>`;
+  }).join('');
+  $('#tabBody').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Aufgabenanalyse</h2>
+      <label class="small"><input type="checkbox" id="onlyFlag" ${onlyFlag ? 'checked' : ''}> nur auffällige</label></div>
+    <p class="small muted"><b>Lösungsquote</b>: Anteil richtiger Antworten (ideal ca. 30–90 %). <b>Trennschärfe</b>: Korrelation der Aufgabe mit dem restlichen Test – ab 0,3 gut, unter 0,2 prüfen. <b>Verteilung</b>: wie oft jede Option gewählt wurde (grün = Lösung).</p>
+    <div class="tscroll"><table class="tbl"><thead><tr><th>Abschnitt</th><th>Teil</th><th>Nr.</th><th>Typ</th><th>Lösung</th><th>Quote</th><th>Trennsch.</th><th>Verteilung</th><th>Hinweise</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  $('#onlyFlag').onchange = e => { tItems.only = e.target.checked; tItems(); };
+}
+
+function tSubs() {
+  const s = stats, secs = s.sections.map(x => x.title);
+  const rows = s.graded.map((x, i) => `<tr class="click" data-i="${i}"><td><b>${esc(x.code)}</b></td>${cur.askName ? `<td>${esc(x.name || '')}</td>` : ''}
+    <td>${new Date(x.submittedAt).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}</td><td>${Math.round((x.durationSec || 0) / 60)} min</td>
+    ${secs.map(t => { const z = x.g.sections.find(q => q.title === t); return `<td>${z ? z.pts + '/' + z.max : '–'}</td>`; }).join('')}
+    <td><b>${x.g.pts}/${x.g.max}</b></td><td class="${x.g.pct >= s.pass ? 'good' : 'badv'}">${x.g.pct} %</td></tr>`).join('');
+  $('#tabBody').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Teilnahmen</h2>
+      <button class="btn ghost sm" id="csv" ${s.n ? '' : 'disabled'}>CSV exportieren</button></div>
+    <p class="small muted">Zeile anklicken für die einzelnen Antworten.</p>
+    <div class="tscroll"><table class="tbl"><thead><tr><th>Code</th>${cur.askName ? '<th>Name</th>' : ''}<th>Abgabe</th><th>Dauer</th>${secs.map(t => `<th>${esc(t)}</th>`).join('')}<th>Punkte</th><th>%</th></tr></thead>
+    <tbody>${rows || `<tr><td colspan="9" class="muted">Noch keine Abgaben.</td></tr>`}</tbody></table></div></div><div id="detail"></div>`;
+  document.querySelectorAll('tr[data-i]').forEach(tr => tr.onclick = () => showDetail(s.graded[+tr.dataset.i]));
+  $('#csv').onclick = exportCsv;
+  if (detail) { const d = s.graded.find(x => x.id === detail); if (d) showDetail(d); }
+}
+
+function showDetail(x) {
+  detail = x.id;
+  const rows = itemsOf(curContent).map(({ gid, s, p, it }) => {
+    const r = x.g.items[gid];
+    return `<tr><td>${esc(s.title)}</td><td>${esc(p.title || p.id)}</td><td>${esc(label(it))}</td><td>${esc(answerText(p, it, r.given))}</td><td>${esc(answerText(p, it, curKey[gid]))}</td><td>${r.ok ? '<span class="good">✓</span>' : '<span class="badv">✗</span>'}</td></tr>`;
+  }).join('');
+  $('#detail').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Code ${esc(x.code)} ${x.name ? '· ' + esc(x.name) : ''}</h2>
+    <div class="row"><b>${x.g.pts}/${x.g.max} (${x.g.pct} %)</b><button class="btn danger sm" id="delSub">Abgabe löschen</button></div></div>
+    <div class="tscroll" style="margin-top:10px"><table class="tbl"><thead><tr><th>Abschnitt</th><th>Teil</th><th>Nr.</th><th>Antwort</th><th>Lösung</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  $('#delSub').onclick = async () => { if (!confirm(`Abgabe ${x.code} endgültig löschen?`)) return; await DB.deleteSub(x.id); detail = null; };
+  $('#detail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function exportCsv() {
+  const s = stats, items = itemsOf(curContent);
+  const head = ['Code', ...(cur.askName ? ['Name'] : []), 'Abgabe', 'Dauer_min', ...s.sections.map(x => x.title), 'Punkte', 'Max', 'Prozent', 'bestanden',
+    ...items.map(i => `${i.s.title} ${i.p.title || i.p.id} ${label(i.it)}`)];
+  const lines = s.graded.map(x => [x.code, ...(cur.askName ? [x.name || ''] : []), new Date(x.submittedAt).toLocaleString('de-DE'), Math.round((x.durationSec || 0) / 60),
+    ...s.sections.map(t => { const z = x.g.sections.find(q => q.title === t.title); return z ? z.pts : ''; }),
+    x.g.pts, x.g.max, String(x.g.pct).replace('.', ','), x.g.pct >= s.pass ? 'ja' : 'nein',
+    ...items.map(i => { const r = x.g.items[i.gid]; return (r.given ?? '') + (r.ok ? ' ✓' : ''); })]);
+  const csv = '﻿' + [head, ...lines].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\r\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = cur.id + '-ergebnisse.csv'; a.click();
+}
+
+function tSettings() {
+  const t = cur, link = base + '?t=' + encodeURIComponent(t.id), over = base + 'uebersicht.html?t=' + encodeURIComponent(t.id);
+  $('#tabBody').innerHTML = `<div class="grid2"><div class="card"><h2>Einstellungen</h2>
+      <label class="field"><span>Status</span><select class="full" id="st">${Object.entries(STATUS).map(([k, l]) => `<option value="${k}" ${t.status === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label class="field"><span>Bestehensgrenze (%)</span><input type="number" id="pp" min="0" max="100" value="${t.passPercent ?? 60}"></label>
+      <label class="row"><input type="checkbox" id="an" ${t.askName ? 'checked' : ''}> Namen abfragen (nur in der Konsole sichtbar)</label>
+      <label class="row" style="margin-top:8px"><input type="checkbox" id="pub" ${t.publishResults ? 'checked' : ''}> Einzelergebnisse freigeben (Teilnehmende sehen ihr Ergebnis mit ihrem Code)</label>
+      <p style="margin-top:14px"><button class="btn" id="saveSet">Speichern</button> <span id="setMsg"></span></p></div>
+    <div class="card"><h2>Links</h2>
+      <p class="small muted">Testlink für die Teilnehmenden</p><div class="row"><span class="linkbox">${esc(link)}</span><button class="btn ghost sm" data-copy="${esc(link)}">Kopieren</button></div>
+      <p class="small muted" style="margin-top:12px">Anonyme Ergebnisübersicht</p><div class="row"><span class="linkbox">${esc(over)}</span><button class="btn ghost sm" data-copy="${esc(over)}">Kopieren</button></div>
+      <p style="margin-top:14px" class="row"><a class="btn ghost" href="${esc(link)}&preview=1" target="_blank">Vorschau (ohne Abgabe)</a></p>
+      <h3 style="margin-top:18px">Datei</h3>
+      <p class="row"><button class="btn ghost sm" id="exp">JSON mit Lösungen herunterladen</button><button class="btn ghost sm" id="rep">Inhalt ersetzen (Import)</button></p>
+      <p class="small muted">Beim Ersetzen bleiben Abgaben erhalten und werden mit dem neuen Lösungsschlüssel neu ausgewertet.</p>
+      <h3 style="margin-top:18px">Löschen</h3><button class="btn danger sm" id="del">Test löschen …</button></div></div>
+    <div class="card">${contentOverview()}</div>`;
+  $('#saveSet').onclick = async () => {
+    const patch = { status: $('#st').value, passPercent: Math.max(0, Math.min(100, +$('#pp').value || 0)), askName: $('#an').checked, publishResults: $('#pub').checked };
+    await DB.updateTest(t.id, patch); Object.assign(cur, patch); Object.assign(tests.find(x => x.id === t.id), patch);
+    recompute(); renderShell(); render();
+  };
+  document.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => navigator.clipboard?.writeText(b.dataset.copy).then(() => b.textContent = 'Kopiert ✓'));
+  $('#exp').onclick = () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(mergeTest(t, curContent, curKey), null, 2)], { type: 'application/json' }));
+    a.download = t.id + '.json'; a.click();
+  };
+  $('#rep').onclick = () => openImport();
+  $('#del').onclick = async () => {
+    const withSubs = stats.n ? confirm(`Auch die ${stats.n} Abgaben löschen? (OK = ja, Abbrechen = Abgaben behalten)`) : false;
+    if (!confirm(`Test „${t.title}“ wirklich löschen?`)) return;
+    await DB.deleteTest(t.id, withSubs); if (unsub) { unsub(); unsub = null; } cur = null; await refreshTests();
+  };
+}
+
+// ---------- Import ----------
+function openImport() {
+  $('#modal').innerHTML = `<div class="modal"><div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Test importieren</h2><button class="btn ghost sm" id="mx">Schließen</button></div>
+    <p class="small muted">Testdatei (JSON, mit Lösungen) einfügen oder hochladen. Die Lösungen werden getrennt gespeichert und sind für Teilnehmende nicht sichtbar. Gibt es die id schon, wird der Inhalt ersetzt – Status und Abgaben bleiben.</p>
+    <div class="row"><input type="file" id="file" accept=".json,application/json"><button class="btn ghost sm" id="sample">Beispieltest laden</button></div>
+    <textarea id="json" rows="16" style="margin-top:10px" placeholder='{ "id": "…", "title": "…", "sections": [ … ] }'></textarea>
+    <div id="chk" style="margin-top:10px"></div>
+    <p class="row" style="margin-top:10px"><button class="btn ghost" id="check">Prüfen</button><button class="btn teal" id="saveImp" disabled>Speichern</button></p></div></div>`;
+  const close = () => $('#modal').innerHTML = '';
+  $('#mx').onclick = close;
+  $('#file').onchange = async e => { const f = e.target.files[0]; if (f) { $('#json').value = await f.text(); check(); } };
+  $('#sample').onclick = async () => {
+    try { const r = await fetch('tests/deutschtest-b2-1.json', { cache: 'no-store' }); $('#json').value = await r.text(); check(); }
+    catch { $('#chk').innerHTML = '<p class="err">Beispieldatei konnte nicht geladen werden (nur online bzw. über einen Webserver möglich).</p>'; }
+  };
+  $('#json').oninput = () => $('#saveImp').disabled = true;
+  let parsed = null;
+  const check = () => {
+    parsed = splitTest($('#json').value);
+    const ex = tests.find(t => t.id === parsed.id);
+    $('#chk').innerHTML = (parsed.errors.length ? `<div class="err"><b>Fehler:</b><ul>${parsed.errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul></div>` :
+      `<div class="okbox"><b>${esc(parsed.meta.title)}</b> – ${parsed.meta.itemCount} Aufgaben, ${parsed.meta.maxPoints} Punkte. ${ex ? '<b>Ersetzt den vorhandenen Test mit dieser id.</b>' : 'Neuer Test (Status: Entwurf).'}</div>`) +
+      (parsed.warnings.length ? `<div class="banner" style="margin-top:8px"><b>Hinweise:</b><ul>${parsed.warnings.map(e => `<li>${esc(e)}</li>`).join('')}</ul></div>` : '');
+    $('#saveImp').disabled = !!parsed.errors.length;
+  };
+  $('#check').onclick = check;
+  $('#saveImp').onclick = async () => {
+    if (!parsed || parsed.errors.length) return;
+    const ex = tests.find(t => t.id === parsed.id);
+    const fields = { ...parsed.meta, content: JSON.stringify(parsed.content) };
+    if (!ex) Object.assign(fields, { status: 'draft', publishResults: false, createdAt: Date.now() });
+    else { delete fields.askName; delete fields.passPercent; }
+    $('#saveImp').disabled = true;
+    try { await DB.saveTest(parsed.id, fields, parsed.key); close(); if (unsub) { unsub(); unsub = null; } cur = null; await refreshTests(parsed.id); }
+    catch (e) { $('#chk').innerHTML += `<p class="err">Speichern fehlgeschlagen: ${esc(e.message)}</p>`; $('#saveImp').disabled = false; }
+  };
+}
+</script>
+</body>
+</html>
