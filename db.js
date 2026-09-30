@@ -1,94 +1,85 @@
-// db.js – Datenzugriff. Firebase (Firestore + Auth) oder DEMO-Modus (localStorage).
-import { FIREBASE_CONFIG, ADMIN_EMAIL } from './config.js';
+// db.js – Datenzugriff. Firebase (Realtime Database + E-Mail-Anmeldung) oder DEMO-Modus (localStorage).
+import { FIREBASE_CONFIG, ADMIN_UID } from './config.js';
 
 export const DEMO = !FIREBASE_CONFIG.apiKey || FIREBASE_CONFIG.apiKey.startsWith('HIER');
-const T = 'dt_tests', K = 'dt_keys', S = 'dt_submissions', Y = 'dt_summaries';
+const T = 'dt_tests', K = 'dt_keys', S = 'dt_submissions', Y = 'dt_summaries'; // nur Demo-Modus
 const V = '10.12.2', BASE = `https://www.gstatic.com/firebasejs/${V}/`;
+const R = 'deutschtest/';   // alles liegt in der Realtime Database unter /deutschtest
 
 let fb = null;
 async function F() {
   if (fb) return fb;
-  const [app, fs, au] = await Promise.all([
-    import(BASE + 'firebase-app.js'), import(BASE + 'firebase-firestore.js'), import(BASE + 'firebase-auth.js')]);
+  const [app, rd, au] = await Promise.all([
+    import(BASE + 'firebase-app.js'), import(BASE + 'firebase-database.js'), import(BASE + 'firebase-auth.js')]);
   const a = app.initializeApp(FIREBASE_CONFIG);
-  fb = { ...fs, ...au, db: fs.getFirestore(a), auth: au.getAuth(a) };
+  fb = { ...rd, ...au, db: rd.getDatabase(a), auth: au.getAuth(a) };
+  fb.r = p => rd.ref(fb.db, R + p);
   await fb.auth.authStateReady();
   return fb;
 }
-const ms = ts => ts?.toMillis ? ts.toMillis() : (typeof ts === 'number' ? ts : Date.now());
+const val = async p => { const f = await F(); const s = await f.get(f.r(p)); return s.exists() ? s.val() : null; };
+const indexFields = t => ({ title: t.title || '', level: t.level || '', status: t.status || 'draft', itemCount: t.itemCount || 0 });
+const doneKey = id => 'dt_done_' + id;
 
-/* ---------------- Firebase ---------------- */
+/* ---------------- Firebase (Realtime Database) ---------------- */
 const Fire = {
   async listTests(statuses = ['open']) {
-    const f = await F(); const out = [];
-    for (const st of statuses) {
-      const snap = await f.getDocs(f.query(f.collection(f.db, T), f.where('status', '==', st)));
-      snap.forEach(d => out.push({ id: d.id, ...d.data() }));
-    }
-    return out;
+    const idx = (await val('index')) || {};
+    return Object.entries(idx).filter(([, v]) => statuses.includes(v.status)).map(([id, v]) => ({ id, ...v }));
   },
-  async getTest(id) {
-    const f = await F();
-    try { const d = await f.getDoc(f.doc(f.db, T, id)); return d.exists() ? { id, ...d.data() } : null; }
-    catch (e) { return null; }
-  },
-  async ensureStudent() {
-    const f = await F();
-    if (!f.auth.currentUser || !f.auth.currentUser.isAnonymous) await f.signInAnonymously(f.auth);
-    return f.auth.currentUser.uid;
-  },
+  async getTest(id) { try { const v = await val('tests/' + id); return v ? { id, ...v } : null; } catch (e) { return null; } },
+  async ensureStudent() { await F(); return 'anon'; },
   async submit(testId, data) {
-    const f = await F(); const uid = await Fire.ensureStudent();
-    await f.setDoc(f.doc(f.db, S, testId + '_' + uid), { ...data, testId, uid, submittedAt: f.serverTimestamp() });
-  },
-  async endStudent() { const f = await F(); if (f.auth.currentUser?.isAnonymous) await f.signOut(f.auth); },
-  async getSummary(id) {
     const f = await F();
-    try { const d = await f.getDoc(f.doc(f.db, Y, id)); return d.exists() ? JSON.parse(d.data().data) : null; }
-    catch (e) { return null; }
+    try { if (localStorage.getItem(doneKey(testId))) throw new Error('Von diesem Gerät wurde dieser Test bereits abgegeben.'); } catch (e) { if (e.message.startsWith('Von')) throw e; }
+    try { await f.set(f.push(f.r('subs/' + testId)), { ...data, submittedAt: f.serverTimestamp() }); }
+    catch (e) { throw new Error(/permission/i.test(e.message) ? 'Der Test ist nicht (mehr) geöffnet.' : e.message); }
+    try { localStorage.setItem(doneKey(testId), '1'); } catch { }
   },
-  // ---- Testmacher ----
-  async onAdmin(cb) {
-    const f = await F();
-    f.onAuthStateChanged(f.auth, u => cb(u && !u.isAnonymous && u.email === ADMIN_EMAIL ? u : null, u));
-  },
-  async login() { const f = await F(); await f.signInWithPopup(f.auth, new f.GoogleAuthProvider()); },
+  async endStudent() { },
+  async getSummary(id) { try { const v = await val('summaries/' + id); return v ? JSON.parse(v) : null; } catch (e) { return null; } },
+  // ---- Testmacher (gleiches Konto wie die Liga-Konsole) ----
+  async onAdmin(cb) { const f = await F(); f.onAuthStateChanged(f.auth, u => cb(u && u.uid === ADMIN_UID ? u : null, u)); },
+  async login(email, pw) { const f = await F(); await f.signInWithEmailAndPassword(f.auth, email, pw); },
   async logout() { const f = await F(); await f.signOut(f.auth); },
-  async isAdmin() { const f = await F(); const u = f.auth.currentUser; return !!(u && !u.isAnonymous && u.email === ADMIN_EMAIL); },
-  async allTests() {
-    const f = await F(); const snap = await f.getDocs(f.collection(f.db, T));
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  },
+  async isAdmin() { const f = await F(); return f.auth.currentUser?.uid === ADMIN_UID; },
+  async allTests() { const t = (await val('tests')) || {}; return Object.entries(t).map(([id, v]) => ({ id, ...v })); },
   async saveTest(id, fields, key) {
     const f = await F();
-    await f.setDoc(f.doc(f.db, T, id), { ...fields, updatedAt: f.serverTimestamp() }, { merge: true });
-    if (key) await f.setDoc(f.doc(f.db, K, id), { key: JSON.stringify(key) });
+    const cur = (await val('tests/' + id)) || {};
+    const full = { ...cur, ...fields, updatedAt: Date.now() };
+    const up = { ['tests/' + id]: full, ['index/' + id]: indexFields(full) };
+    if (key) up['keys/' + id] = JSON.stringify(key);
+    await f.update(f.ref(f.db, 'deutschtest'), up);
   },
-  async updateTest(id, patch) { const f = await F(); await f.updateDoc(f.doc(f.db, T, id), patch); },
-  async getKey(id) {
-    const f = await F(); const d = await f.getDoc(f.doc(f.db, K, id));
-    return d.exists() ? JSON.parse(d.data().key) : {};
+  async updateTest(id, patch) {
+    const f = await F(); const up = {};
+    for (const [k, v] of Object.entries(patch)) up['tests/' + id + '/' + k] = v;
+    for (const k of ['title', 'level', 'status', 'itemCount']) if (k in patch) up['index/' + id + '/' + k] = patch[k];
+    await f.update(f.ref(f.db, 'deutschtest'), up);
   },
+  async getKey(id) { const v = await val('keys/' + id); return v ? JSON.parse(v) : {}; },
   async deleteTest(id, withSubs) {
     const f = await F();
-    if (withSubs) {
-      const snap = await f.getDocs(f.query(f.collection(f.db, S), f.where('testId', '==', id)));
-      for (const d of snap.docs) await f.deleteDoc(d.ref);
-    }
-    await f.deleteDoc(f.doc(f.db, K, id)); await f.deleteDoc(f.doc(f.db, Y, id)); await f.deleteDoc(f.doc(f.db, T, id));
+    const up = { ['tests/' + id]: null, ['keys/' + id]: null, ['summaries/' + id]: null, ['index/' + id]: null };
+    if (withSubs) up['subs/' + id] = null;
+    await f.update(f.ref(f.db, 'deutschtest'), up);
   },
   async watchSubs(testId, cb) {
     const f = await F();
-    return f.onSnapshot(f.query(f.collection(f.db, S), f.where('testId', '==', testId)),
-      snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data(), submittedAt: ms(d.data().submittedAt) }))),
-      err => console.error(err));
+    return f.onValue(f.r('subs/' + testId), snap => {
+      const v = snap.val() || {};
+      cb(Object.entries(v).map(([id, d]) => ({ id, ...d, submittedAt: d.submittedAt || Date.now() })));
+    }, err => console.error(err));
   },
-  async deleteSub(docId) { const f = await F(); await f.deleteDoc(f.doc(f.db, S, docId)); },
-  async saveSummary(id, obj) {
-    const f = await F();
-    await f.setDoc(f.doc(f.db, Y, id), { data: JSON.stringify(obj), updatedAt: f.serverTimestamp() });
-  },
+  async deleteSub(docId) { const f = await F(); await f.remove(f.r('subs/' + curTestFor(docId) + '/' + docId)); },
+  async saveSummary(id, obj) { const f = await F(); await f.set(f.r('summaries/' + id), JSON.stringify(obj)); },
 };
+// Abgaben-ID → Test merken (für deleteSub)
+const subOwner = {};
+const curTestFor = id => subOwner[id];
+const _watch = Fire.watchSubs;
+Fire.watchSubs = async (testId, cb) => _watch(testId, list => { list.forEach(x => subOwner[x.id] = testId); cb(list); });
 
 /* ---------------- DEMO (localStorage) ---------------- */
 const LS = 'dt_demo_db';

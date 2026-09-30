@@ -46,12 +46,17 @@ const base = location.href.replace(/konsole\.html.*$/, '');
 
 DB.onAdmin(async (admin, user) => {
   if (!admin) {
-    $('#who').hidden = !user; $('#who').textContent = user ? (user.email || 'anonym') + ' – kein Zugriff' : '';
+    $('#who').hidden = true;
     $('#logout').hidden = !user;
-    app.innerHTML = `<div class="card" style="max-width:520px;margin:40px auto;text-align:center">
-      <h1>Testkonsole</h1><p class="muted">Nur für den Testmacher. Bitte mit dem berechtigten Google-Konto anmelden.</p>
-      <button class="btn" id="login">Mit Google anmelden</button><div id="lerr"></div></div>`;
-    $('#login').onclick = () => DB.login().catch(e => $('#lerr').innerHTML = `<p class="err">${esc(e.message)}</p>`);
+    app.innerHTML = `<div class="card" style="max-width:440px;margin:40px auto">
+      <h1>Testkonsole</h1><p class="muted">Nur für den Testmacher. Melde dich mit derselben E-Mail und demselben Passwort an wie in der Liga-Konsole.</p>
+      <form id="lf"><label class="field"><span>E-Mail</span><input type="text" id="em" autocomplete="username" inputmode="email"></label>
+      <label class="field"><span>Passwort</span><input type="password" id="pw" autocomplete="current-password"></label>
+      <button class="btn" type="submit" style="width:100%">Anmelden</button></form><div id="lerr" style="margin-top:10px"></div></div>`;
+
+    $('#lf').onsubmit = e => { e.preventDefault(); $('#lerr').innerHTML = '';
+      DB.login($('#em').value.trim(), $('#pw').value).catch(err => $('#lerr').innerHTML = `<p class="err">${/invalid|wrong|not-found|credential/i.test(err.code || err.message) ? 'E-Mail oder Passwort stimmt nicht.' : esc(err.message)}</p>`); };
+    if (user) $('#lerr').innerHTML = '<p class="err">Dieses Konto hat keinen Zugriff auf die Testkonsole.</p>';
     return;
   }
   $('#who').hidden = false; $('#who').textContent = admin.email; $('#logout').hidden = DEMO;
@@ -332,7 +337,7 @@ function tSettings() {
 // ---------- Import ----------
 function openImport() {
   $('#modal').innerHTML = `<div class="modal"><div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Test importieren</h2><button class="btn ghost sm" id="mx">Schließen</button></div>
-    <p class="small muted">Testdatei (JSON, mit Lösungen) einfügen oder hochladen. Die Lösungen werden getrennt gespeichert und sind für Teilnehmende nicht sichtbar. Gibt es die id schon, wird der Inhalt ersetzt – Status und Abgaben bleiben.</p>
+    <p class="small muted">Testdatei (JSON, mit Lösungen) auswählen oder einfügen. Die Lösungen werden getrennt gespeichert und sind für Teilnehmende nicht sichtbar. Gibt es die id schon, wird der Inhalt ersetzt – Status und Abgaben bleiben.</p>
     <div class="row"><input type="file" id="file" accept=".json,application/json"><button class="btn ghost sm" id="sample">Beispieltest laden</button></div>
     <textarea id="json" rows="16" style="margin-top:10px" placeholder='{ "id": "…", "title": "…", "sections": [ … ] }'></textarea>
     <div id="chk" style="margin-top:10px"></div>
