@@ -52,7 +52,7 @@ export function splitTest(raw) {
   if (errors.length) return { errors, warnings };
 
   const key = {};
-  const partIds = new Set();
+  const partIds = new Set(), keyLater = new Set();
   let itemCount = 0, maxPoints = 0;
 
   t.sections.forEach((s, si) => {
@@ -81,7 +81,9 @@ export function splitTest(raw) {
         it.points = Number(it.points ?? 1);
         const gid = p.id + '.' + it.id;
         let ans = isTextType(it.type) ? (it.accept ?? it.answer) : it.answer;
-        if (ans == null || ans === '' || (Array.isArray(ans) && !ans.length)) errors.push(`${where} ${it.id}: Lösung fehlt.`);
+        if (ans == null || ans === '' || (Array.isArray(ans) && !ans.length)) {
+          if (p.keyLater) keyLater.add(where); else errors.push(`${where} ${it.id}: Lösung fehlt.`);
+        }
         else {
           if (isTextType(it.type)) ans = (Array.isArray(ans) ? ans : [ans]).map(String);
           if (it.type === 'order') {
@@ -118,7 +120,10 @@ export function splitTest(raw) {
     itemCount, maxPoints,
   };
   const content = { id: t.id, title: t.title, level: meta.level, description: meta.description, sections: t.sections };
+  if (t.lockSections) content.lockSections = true;
+  if (t.timeMin) content.timeMin = Number(t.timeMin);
   if (!itemCount) warnings.push('Der Test enthält noch keine Aufgaben.');
+  keyLater.forEach(w => warnings.push(`${w}: Lösungen fehlen noch – nach dem Import in der Konsole unter „Lösungen“ eintragen. Bis dahin wird der Teil nicht gewertet.`));
   return { id: t.id, meta, content, key, errors, warnings };
 }
 
@@ -146,6 +151,7 @@ export function grade(content, key, answers) {
     const sec = { id: s.id, title: s.title, pts: 0, max: 0 };
     (s.parts || []).forEach(p => (p.items || []).forEach(it => {
       const gid = p.id + '.' + it.id, pts = it.points ?? 1, given = answers?.[gid] ?? null;
+      if (key[gid] == null) { res.items[gid] = { given, ok: false, pts: 0, max: 0, nokey: true }; return; }
       const ok = isCorrect(it, key[gid], given);
       sec.max += pts; if (ok) sec.pts += pts;
       res.items[gid] = { given, ok, pts: ok ? pts : 0, max: pts };
@@ -171,4 +177,18 @@ export function makeCode() {
   const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const r = crypto.getRandomValues(new Uint32Array(6));
   return [...r].map(x => A[x % A.length]).join('');
+}
+
+// Ausführliches Einzelergebnis (wird von der Konsole berechnet und an die Teilnehmenden geschickt)
+export function buildResult(content, key, answers, passPercent = 60) {
+  const g = grade(content, key, answers);
+  const short = t => { const x = String(t || '').replace(/\*\*/g, '').replace(/\s+/g, ' ').trim(); return x.length > 90 ? x.slice(0, 88) + '…' : x; };
+  const items = itemsOf(content).filter(x => key[x.gid] != null).map(({ gid, s, p, it }) => ({
+    sec: s.title, part: p.title || p.id, nr: String(label(it)), q: short(it.prompt),
+    given: answerText(p, it, g.items[gid].given), key: answerText(p, it, key[gid]), ok: g.items[gid].ok,
+  }));
+  return {
+    pts: g.pts, max: g.max, pct: g.pct, passed: g.pct >= passPercent, passPercent,
+    sections: g.sections.map(z => ({ title: z.title, pts: z.pts, max: z.max, pct: z.pct })), items,
+  };
 }

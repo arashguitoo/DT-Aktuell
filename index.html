@@ -19,7 +19,7 @@
 
 <script type="module">
 import { DB, DEMO } from './db.js';
-import { esc, fmt, optionsFor, label, grade, makeCode, answerText, itemsOf } from './engine.js';
+import { esc, fmt, optionsFor, label, makeCode, buildResult } from './engine.js';
 
 const $ = s => document.querySelector(s);
 const app = $('#app');
@@ -27,7 +27,8 @@ const params = new URLSearchParams(location.search);
 const TID = params.get('t');
 const PREVIEW = params.get('preview') === '1';
 
-let test = null, content = null, state = null, timerH = null;
+let test = null, content = null, state = null, timerH = null, LOCKED = false;
+const RKEY = id => 'dt_mine_' + id;
 const SKEY = id => 'dt_state_' + id + (PREVIEW ? '_preview' : '');
 const save = () => { try { localStorage.setItem(SKEY(test.id), JSON.stringify(state)); } catch { } };
 const loadState = id => { try { return JSON.parse(localStorage.getItem(SKEY(id))); } catch { return null; } };
@@ -42,10 +43,13 @@ async function init() {
   test = await DB.getTest(TID);
   if (!test) return fail('Dieser Test existiert nicht oder ist noch nicht freigegeben.');
   if (PREVIEW && !(await DB.isAdmin())) return fail('Die Vorschau ist nur für den Testmacher (in der Konsole angemeldet).');
-  if (!PREVIEW && test.status !== 'open') return fail(test.status === 'closed'
+  if (!PREVIEW && test.status !== 'open' && !hasMine()) return fail(test.status === 'closed'
     ? 'Dieser Test ist geschlossen. <a href="uebersicht.html?t=' + esc(TID) + '">Zur Ergebnisübersicht</a>' : 'Dieser Test ist noch nicht geöffnet.');
   content = JSON.parse(test.content);
   content.sections = content.sections.filter(s => (s.parts || []).some(p => (p.items || []).length));
+  LOCKED = !!content.lockSections;
+  if (!PREVIEW) { let mine = null; try { mine = JSON.parse(localStorage.getItem(RKEY(TID))); } catch { }
+    if (mine && mine.sid) return showMine(mine); }
   document.title = test.title;
   $('#brandSub').textContent = test.level || '';
   state = loadState(TID);
@@ -75,10 +79,12 @@ function showStart() {
     <h1>${esc(test.title)}</h1>${test.description ? `<p>${fmt(test.description)}</p>` : ''}
     <h3 style="margin-top:14px">Ablauf</h3><ol>${secs}</ol>
     <ul class="muted small">
-      <li>Die Abschnitte kommen nacheinander. Wenn du einen Abschnitt abschließt, kannst du <b>nicht zurück</b>.</li>
+      ${LOCKED ? '<li>Die Abschnitte kommen nacheinander. Wenn du einen Abschnitt abschließt, kannst du <b>nicht zurück</b>.</li>'
+        : '<li>Du kannst jederzeit zwischen den Testteilen wechseln (oben auf einen Teil tippen oder unten „Zurück“/„Weiter“). Erst mit „Test abgeben“ ist der Test beendet.</li>'}
+      ${content.timeMin && !LOCKED ? `<li>Zeit für den ganzen Test: <b>${content.timeMin} Minuten</b>.</li>` : ''}
       ${hasAudio ? '<li>Die Hörtexte kannst du nur so oft abspielen, wie angegeben.</li>' : ''}
       <li>Deine Antworten werden automatisch gespeichert – auch wenn die Seite neu lädt.</li>
-      <li>Nach der Abgabe bekommst du einen <b>persönlichen Code</b>. Damit findest du später dein Ergebnis – anonym.</li>
+      <li>Nach der Abgabe bekommst du einen <b>persönlichen Code</b> und siehst dein Ergebnis.</li>
     </ul>
     ${test.askName && !PREVIEW ? `<label class="field"><span>Dein Name</span><input type="text" id="name" maxlength="60" autocomplete="name"></label>` : ''}
     <div id="startErr"></div>
@@ -89,7 +95,8 @@ function showStart() {
     $('#go').disabled = true;
     try { if (!PREVIEW) await DB.ensureStudent(); }
     catch (e) { $('#startErr').innerHTML = `<p class="err">Verbindung fehlgeschlagen: ${esc(e.message)}</p>`; $('#go').disabled = false; return; }
-    state = { testId: test.id, code: makeCode(), name, answers: {}, plays: {}, secIdx: 0, startedAt: Date.now(), deadline: null };
+    state = { testId: test.id, code: makeCode(), name, answers: {}, plays: {}, secIdx: 0, startedAt: Date.now(),
+      deadline: !LOCKED && content.timeMin ? Date.now() + content.timeMin * 60000 : null };
     startSection(0);
   };
 }
@@ -98,15 +105,20 @@ function showStart() {
 function startSection(i) {
   state.secIdx = i;
   const s = content.sections[i];
-  state.deadline = s.timeMin ? Date.now() + s.timeMin * 60000 : null;
+  if (LOCKED) state.deadline = s.timeMin ? Date.now() + s.timeMin * 60000 : null;
   save(); runSection(); scrollTo(0, 0);
+}
+
+function countIn(s) {
+  let n = 0, a = 0;
+  s.parts.forEach(p => (p.items || []).forEach(it => { n++; if (state.answers[p.id + '.' + it.id] != null) a++; }));
+  return { n, a };
 }
 
 function runSection() {
   const i = state.secIdx, s = content.sections[i];
   $('#codePill').hidden = PREVIEW; $('#codePill').textContent = 'Code ' + state.code;
-  const steps = content.sections.map((x, j) => `<div class="step ${j < i ? 'done' : j === i ? 'now' : ''}"><b>Teil ${j + 1}</b>${esc(x.title)}</div>`).join('');
-  app.innerHTML = banner() + `<div class="steps">${steps}</div>
+  app.innerHTML = banner() + `<div class="steps" id="steps"></div>
     <h1>${esc(s.title)}</h1>${s.instructions ? `<p class="muted">${fmt(s.instructions)}</p>` : ''}
     <div id="parts"></div>`;
   const box = $('#parts');
@@ -114,6 +126,17 @@ function runSection() {
   box.addEventListener('change', onAnswer); box.addEventListener('input', onAnswer);
   $('#footer').hidden = false;
   updateFooter(); startTimer();
+}
+
+function drawSteps() {
+  const el = $('#steps'); if (!el) return;
+  const i = state.secIdx;
+  el.innerHTML = content.sections.map((x, j) => {
+    const c = countIn(x), cls = j === i ? 'now' : LOCKED ? (j < i ? 'done' : '') : (c.a === c.n ? 'done' : '');
+    const tag = LOCKED || j === i ? 'div' : 'button';
+    return `<${tag} class="step ${cls}" ${tag === 'button' ? `data-go="${j}" type="button"` : ''}><b>Teil ${j + 1} · ${c.a}/${c.n}</b>${esc(x.title)}</${tag}>`;
+  }).join('');
+  el.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { stopAudio(); startSection(+b.dataset.go); });
 }
 
 function onAnswer(e) {
@@ -136,17 +159,40 @@ function updateBankMarks() {
   });
 }
 
-function sectionCounts() {
-  const s = content.sections[state.secIdx]; let n = 0, a = 0;
-  s.parts.forEach(p => (p.items || []).forEach(it => { n++; if (state.answers[p.id + '.' + it.id] != null) a++; }));
-  return { n, a };
-}
+function sectionCounts() { return countIn(content.sections[state.secIdx]); }
+function totalCounts() { let n = 0, a = 0; content.sections.forEach(s => { const c = countIn(s); n += c.n; a += c.a; }); return { n, a }; }
 
 function updateFooter() {
-  const { n, a } = sectionCounts(), last = state.secIdx === content.sections.length - 1;
-  $('#footerIn').innerHTML = `<span><b>${a}</b> von ${n} beantwortet</span>
-    <button class="btn ${last ? 'teal' : ''}" id="next">${last ? (PREVIEW ? 'Vorschau auswerten' : 'Test abgeben') : 'Weiter: ' + esc(content.sections[state.secIdx + 1].title) + ' →'}</button>`;
-  $('#next').onclick = () => next(false);
+  drawSteps();
+  const i = state.secIdx, last = i === content.sections.length - 1, { n, a } = sectionCounts();
+  const submitLbl = PREVIEW ? 'Vorschau auswerten' : 'Test abgeben';
+  if (LOCKED) {
+    $('#footerIn').innerHTML = `<span><b>${a}</b> von ${n} beantwortet</span>
+      <button class="btn ${last ? 'teal' : ''}" id="next">${last ? submitLbl : 'Weiter: ' + esc(content.sections[i + 1].title) + ' →'}</button>`;
+    $('#next').onclick = () => next(false);
+    return;
+  }
+  const t = totalCounts();
+  $('#footerIn').innerHTML = `<div class="row">${i > 0 ? `<button class="btn ghost sm" id="prev">← ${esc(content.sections[i - 1].title)}</button>` : ''}
+      <span class="small"><b>${t.a}</b> von ${t.n} beantwortet</span></div>
+    <div class="row">${last ? '' : `<button class="btn sm" id="fwd">${esc(content.sections[i + 1].title)} →</button>`}
+      <button class="btn teal sm" id="submit">${submitLbl}</button></div>`;
+  if ($('#prev')) $('#prev').onclick = () => { stopAudio(); startSection(i - 1); };
+  if ($('#fwd')) $('#fwd').onclick = () => { stopAudio(); startSection(i + 1); };
+  $('#submit').onclick = () => submitAll(false);
+}
+
+function submitAll(forced) {
+  if (!forced) {
+    const t = totalCounts(), miss = t.n - t.a;
+    let msg = 'Möchtest du den Test jetzt abgeben? Danach kannst du nichts mehr ändern.';
+    if (miss) {
+      const where = content.sections.map(s => { const c = countIn(s); return c.n - c.a ? `• ${s.title}: ${c.n - c.a} offen` : ''; }).filter(Boolean).join('\n');
+      msg = `Du hast noch ${miss} Aufgabe${miss > 1 ? 'n' : ''} nicht beantwortet:\n${where}\n\n` + msg;
+    }
+    if (!confirm(msg)) return;
+  }
+  stopAudio(); finish();
 }
 
 function next(forced) {
@@ -171,7 +217,9 @@ function startTimer() {
     const left = Math.max(0, Math.round((state.deadline - Date.now()) / 1000));
     el.textContent = '⏱ ' + Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
     el.classList.toggle('warn', left <= 60);
-    if (left <= 0) { clearInterval(timerH); alert('Die Zeit für diesen Abschnitt ist abgelaufen.'); next(true); }
+    if (left <= 0) { clearInterval(timerH);
+      if (LOCKED) { alert('Die Zeit für diesen Abschnitt ist abgelaufen.'); next(true); }
+      else { alert('Die Zeit ist abgelaufen. Der Test wird jetzt abgegeben.'); submitAll(true); } }
   };
   tick(); timerH = setInterval(tick, 1000);
 }
@@ -195,7 +243,7 @@ function renderPart(p) {
       });
       return '<p>' + chunks.join('') + '</p>';
     }).join('');
-    h += `<div class="text">${html}</div>`;
+    h += `<div class="text ${gapIds.size ? '' : 'plain'}">${html}</div>`;
     const choiceGaps = items.filter(it => gapIds.has(it.id) && it.type === 'choice');
     const longOpts = p.showOptions ?? choiceGaps.some(it => it.options.some(o => o.t.length > 22));
     if (choiceGaps.length && longOpts) h += `<div class="optlist">${choiceGaps.map(it => `<div class="optgroup"><div class="ohead">${esc(label(it))}</div>
@@ -219,7 +267,7 @@ function gapControl(p, it) {
 
 function question(p, it) {
   const gid = p.id + '.' + it.id, v = state.answers[gid];
-  const head = `<div class="qhead"><span class="gapno">${esc(label(it))}</span><span>${fmt(it.prompt || '')}</span></div>`;
+  const head = `<div class="qhead ${String(it.prompt || '').length > 90 ? 'long' : ''}"><span class="gapno">${esc(label(it))}</span><span>${fmt(it.prompt || '')}</span></div>`;
   if (it.type === 'order') return `<div class="q ord" data-ord="${esc(gid)}">${head}<div class="sent"></div><div class="pool"></div></div>`;
   if (it.type === 'input') return `<div class="q">${head}<input type="text" class="gapin ${v ? 'filled' : ''}" style="width:100%" data-gid="${esc(gid)}" value="${esc(v || '')}" autocomplete="off"></div>`;
   if (it.type === 'bank') return `<div class="q">${head}<select class="gap ${v ? 'filled' : ''}" data-gid="${esc(gid)}"><option value="">…</option>${p.bank.map(o => `<option value="${esc(o.k)}" ${v === o.k ? 'selected' : ''}>${esc(o.k)}  ${esc(o.t)}</option>`).join('')}</select></div>`;
@@ -285,15 +333,11 @@ async function finish() {
     startedAt: state.startedAt, durationSec: Math.round((Date.now() - state.startedAt) / 1000),
   };
   try {
-    await DB.submit(test.id, data);
+    const sid = await DB.submit(test.id, data);
+    const mine = { sid, code: state.code, name: state.name || '' };
+    try { localStorage.setItem(RKEY(test.id), JSON.stringify(mine)); } catch { }
     clearState(test.id); await DB.endStudent().catch(() => { });
-    const code = state.code;
-    $('#codePill').hidden = true;
-    app.innerHTML = `<div class="card" style="text-align:center">
-      <h1>Vielen Dank!</h1><p>Dein Test ist abgegeben.</p>
-      <p style="margin-top:18px">Dein persönlicher Code:</p><div class="code">${esc(code)}</div>
-      <p class="muted" style="margin-top:12px">Schreib dir den Code auf oder mach ein Foto.<br>Damit siehst du dein Ergebnis, sobald es freigegeben ist.</p>
-      <p><a class="btn ghost" href="uebersicht.html?t=${encodeURIComponent(test.id)}">Zur Ergebnisübersicht</a></p></div>`;
+    showMine(mine);
   } catch (e) {
     app.innerHTML = `<div class="card"><h2>Abgabe fehlgeschlagen</h2><p class="err">${esc(e.message || e)}</p>
       <p>Deine Antworten sind gespeichert. Prüfe die Internetverbindung und versuche es noch einmal.</p>
@@ -302,21 +346,62 @@ async function finish() {
   }
 }
 
+function hasMine() { try { return !!JSON.parse(localStorage.getItem(RKEY(TID)))?.sid; } catch { return false; } }
+
+// Eigene Abgabe: Code + ausführliches Ergebnis (kommt von der Konsole)
+let stopWatch = null;
+async function showMine(mine) {
+  $('#footer').hidden = true; $('#timer').hidden = true; $('#codePill').hidden = true;
+  app.innerHTML = banner() + `<div class="card" style="text-align:center">
+      <h1>Vielen Dank${mine.name ? ', ' + esc(mine.name) : ''}!</h1><p>Dein Test ist abgegeben.</p>
+      <p style="margin-top:14px">Dein persönlicher Code:</p><div class="code">${esc(mine.code)}</div>
+      <p class="muted small" style="margin-top:10px">Schreib dir den Code auf oder mach ein Foto.</p></div>
+    <div id="res"><div class="card"><h2>Dein Ergebnis</h2><p class="muted">Dein Ergebnis wird berechnet … <span class="spin"></span></p></div></div>
+    <p class="small muted" style="text-align:center"><a href="#" id="other">Anderer Teilnehmer an diesem Gerät?</a></p>`;
+  $('#other').onclick = e => {
+    e.preventDefault();
+    if (!confirm('Das eigene Ergebnis wird auf diesem Gerät nicht mehr angezeigt (der Code bleibt gültig). Für eine andere Person neu starten?')) return;
+    try { localStorage.removeItem(RKEY(TID)); localStorage.removeItem('dt_done_' + TID); } catch { }
+    location.reload();
+  };
+  let waited = false;
+  const slow = setTimeout(() => { waited = true; const r = $('#res .muted'); if (r) r.innerHTML = 'Dein Ergebnis erscheint hier, sobald deine Lehrkraft die Auswertung startet. Du kannst diese Seite offen lassen oder später wieder aufrufen – dein Code bleibt gültig.'; }, 15000);
+  if (stopWatch) stopWatch();
+  stopWatch = await DB.watchResult(TID, mine.sid, r => {
+    if (!r) return;
+    clearTimeout(slow);
+    if (r.hidden) { $('#res').innerHTML = `<div class="card"><h2>Dein Ergebnis</h2><p class="muted">Deine Lehrkraft gibt die Ergebnisse später frei. Dein Code: <b>${esc(mine.code)}</b></p></div>`; return; }
+    $('#res').innerHTML = renderResult(r);
+  });
+}
+
+function renderResult(r, preview) {
+  const secs = r.sections.map(x => `<div class="hbar"><span>${esc(x.title)}</span><div class="t"><i style="width:${x.pct}%"></i></div><span class="n">${x.pts}/${x.max}</span></div>`).join('');
+  const bySec = {};
+  r.items.forEach(it => (bySec[it.sec] = bySec[it.sec] || []).push(it));
+  const detail = Object.entries(bySec).map(([sec, list]) => {
+    let lastPart = '';
+    const rows = list.map(it => {
+      const head = it.part !== lastPart ? `<div class="rpart">${esc(it.part)}</div>` : ''; lastPart = it.part;
+      return head + `<div class="ritem ${it.ok ? 'ok' : 'no'}"><span class="rmark">${it.ok ? '✓' : '✗'}</span><span class="gapno">${esc(it.nr)}</span>
+        <div class="rbody">${it.q ? `<div class="rq">${esc(it.q)}</div>` : ''}
+          <div>Deine Antwort: <b>${esc(it.given)}</b></div>${it.ok ? '' : `<div class="rkey">Richtig: <b>${esc(it.key)}</b></div>`}</div></div>`;
+    }).join('');
+    const ok = list.filter(x => x.ok).length;
+    return `<details class="card rsec" ${preview ? 'open' : ''}><summary><b>${esc(sec)}</b> <span class="muted">– ${ok} von ${list.length} richtig</span></summary>${rows}</details>`;
+  }).join('');
+  return `<div class="card"><h2>Dein Ergebnis</h2>
+      <div class="${r.passed ? 'okbox' : 'banner'}" style="font-size:1.15rem;margin-bottom:12px"><b>${r.pts} von ${r.max} Punkten (${r.pct} %)</b>${r.passPercent ? ` – ${r.passed ? 'bestanden' : 'noch nicht bestanden'} (ab ${r.passPercent} %)` : ''}</div>
+      ${secs}<p class="small muted" style="margin-top:12px">Unten siehst du jede Aufgabe mit deiner Antwort. Tippe auf einen Testteil, um ihn aufzuklappen.</p></div>${detail}`;
+}
+
 async function previewResult() {
   const key = await DB.getKey(test.id);
   const full = JSON.parse(test.content);
-  const g = grade(full, key, state.answers);
-  const rows = itemsOf(full).map(({ gid, s, p, it }) => {
-    const r = g.items[gid];
-    return `<tr><td>${esc(s.title)}</td><td>${esc(p.title || p.id)}</td><td>${esc(label(it))}</td>
-      <td>${esc(answerText(p, it, r.given))}</td><td>${esc(answerText(p, it, key[gid]))}</td><td>${r.ok ? '<span class="good">✓</span>' : '<span class="badv">✗</span>'}</td></tr>`;
-  }).join('');
+  const r = buildResult(full, key, state.answers, test.passPercent ?? 60);
   clearState(test.id);
-  app.innerHTML = banner() + `<div class="card"><h1>Vorschau-Auswertung</h1>
-    <p><b>${g.pts} / ${g.max} Punkte (${g.pct} %)</b></p>
-    ${g.sections.map(s => `<div class="hbar"><span>${esc(s.title)}</span><div class="t"><i style="width:${s.pct}%"></i></div><span class="n">${s.pts}/${s.max}</span></div>`).join('')}
-    </div><div class="card tscroll"><table class="tbl"><thead><tr><th>Abschnitt</th><th>Teil</th><th>Nr.</th><th>Gegeben</th><th>Lösung</th><th></th></tr></thead><tbody>${rows}</tbody></table>
-    <p style="margin-top:14px"><a class="btn" href="?t=${encodeURIComponent(test.id)}&preview=1">Vorschau neu starten</a></p></div>`;
+  app.innerHTML = banner() + `<p class="banner">So sehen die Teilnehmenden ihr Ergebnis nach der Abgabe.</p>` + renderResult(r, true) +
+    `<p><a class="btn" href="?t=${encodeURIComponent(test.id)}&preview=1">Vorschau neu starten</a></p>`;
 }
 </script>
 </body>

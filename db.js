@@ -32,10 +32,18 @@ const Fire = {
   async submit(testId, data) {
     const f = await F();
     try { if (localStorage.getItem(doneKey(testId))) throw new Error('Von diesem Gerät wurde dieser Test bereits abgegeben.'); } catch (e) { if (e.message.startsWith('Von')) throw e; }
-    try { await f.set(f.push(f.r('subs/' + testId)), { ...data, submittedAt: f.serverTimestamp() }); }
+    const ref = f.push(f.r('subs/' + testId));
+    try { await f.set(ref, { ...data, submittedAt: f.serverTimestamp() }); }
     catch (e) { throw new Error(/permission/i.test(e.message) ? 'Der Test ist nicht (mehr) geöffnet.' : e.message); }
     try { localStorage.setItem(doneKey(testId), '1'); } catch { }
+    return ref.key;
   },
+  async watchResult(testId, sid, cb) {
+    const f = await F();
+    return f.onValue(f.r('results/' + testId + '/' + sid), snap => cb(snap.exists() ? JSON.parse(snap.val()) : null), () => cb(null));
+  },
+  async saveResult(testId, sid, obj) { const f = await F(); await f.set(f.r('results/' + testId + '/' + sid), JSON.stringify(obj)); },
+  async deleteResult(testId, sid) { const f = await F(); await f.remove(f.r('results/' + testId + '/' + sid)); },
   async endStudent() { },
   async getSummary(id) { try { const v = await val('summaries/' + id); return v ? JSON.parse(v) : null; } catch (e) { return null; } },
   // ---- Testmacher (gleiches Konto wie die Liga-Konsole) ----
@@ -62,7 +70,7 @@ const Fire = {
   async deleteTest(id, withSubs) {
     const f = await F();
     const up = { ['tests/' + id]: null, ['keys/' + id]: null, ['summaries/' + id]: null, ['index/' + id]: null };
-    if (withSubs) up['subs/' + id] = null;
+    if (withSubs) { up['subs/' + id] = null; up['results/' + id] = null; }
     await f.update(f.ref(f.db, 'deutschtest'), up);
   },
   async watchSubs(testId, cb) {
@@ -72,7 +80,7 @@ const Fire = {
       cb(Object.entries(v).map(([id, d]) => ({ id, ...d, submittedAt: d.submittedAt || Date.now() })));
     }, err => console.error(err));
   },
-  async deleteSub(docId) { const f = await F(); await f.remove(f.r('subs/' + curTestFor(docId) + '/' + docId)); },
+  async deleteSub(docId) { const f = await F(); const t = curTestFor(docId); await f.remove(f.r('subs/' + t + '/' + docId)); await f.remove(f.r('results/' + t + '/' + docId)); },
   async saveSummary(id, obj) { const f = await F(); await f.set(f.r('summaries/' + id), JSON.stringify(obj)); },
 };
 // Abgaben-ID → Test merken (für deleteSub)
@@ -99,7 +107,15 @@ const Demo = {
     if (col(db, T)[testId]?.status !== 'open') throw new Error('Der Test ist nicht (mehr) geöffnet.');
     if (col(db, S)[id]) throw new Error('Von diesem Gerät wurde bereits abgegeben.');
     col(db, S)[id] = { ...data, testId, uid, submittedAt: Date.now() }; store(db);
+    return id;
   },
+  async watchResult(testId, sid, cb) {
+    let last = '';
+    const tick = () => { const v = col(load(), 'dt_results')[testId + '/' + sid] || ''; if (v !== last) { last = v; cb(v ? JSON.parse(v) : null); } };
+    cb(null); tick(); const h = setInterval(tick, 1500); return () => clearInterval(h);
+  },
+  async saveResult(testId, sid, obj) { const db = load(); col(db, 'dt_results')[testId + '/' + sid] = JSON.stringify(obj); store(db); },
+  async deleteResult(testId, sid) { const db = load(); delete col(db, 'dt_results')[testId + '/' + sid]; store(db); },
   async endStudent() { try { sessionStorage.removeItem('dt_demo_uid'); } catch { } },
   async getSummary(id) { const v = col(load(), Y)[id]; return v ? JSON.parse(v.data) : null; },
   async onAdmin(cb) { cb({ email: 'Demo-Modus' }); },

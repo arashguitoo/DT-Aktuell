@@ -58,6 +58,8 @@ textarea { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13p
 .part-head .instr { margin: 6px 0 0; color: var(--muted); }
 .part-body { padding: 18px 20px; }
 .text { background: #fcfbf8; border: 1px solid #e9e4d8; border-radius: 10px; padding: 16px 18px; line-height: 2.15; }
+.text.plain { line-height: 1.6; }
+.qhead.long { font-weight: 400; }
 .text p { margin: 0 0 12px; } .text p:last-child { margin-bottom: 0; }
 .gapwrap { display: inline-flex; align-items: center; gap: 3px; vertical-align: baseline; max-width: 100%; }
 .gapno { display: inline-block; min-width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 6px; background: var(--navy); color: #fff; font-size: .78rem; font-weight: 700; }
@@ -94,6 +96,22 @@ input.gapin { width: 9em; max-width: 100%; padding: 3px 8px; border: 2px dashed 
 .tok:hover { background: #eef2f7; }
 .tok.in { background: var(--navy); border-color: var(--navy); color: #fff; }
 .tok.reset { border-style: dashed; color: var(--muted); font-weight: 400; }
+
+/* Ergebnis */
+.rsec summary { cursor: pointer; list-style: none; padding: 2px 0; }
+.rsec summary::-webkit-details-marker { display: none; }
+.rsec summary::before { content: '▸ '; color: var(--muted); }
+.rsec[open] summary::before { content: '▾ '; }
+.rpart { margin: 16px 0 6px; font-weight: 700; color: var(--navy); font-size: .95rem; }
+.ritem { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border-radius: 9px; margin: 6px 0; border: 1px solid var(--line); }
+.ritem.ok { background: var(--ok-soft); border-color: #bfe0cb; }
+.ritem.no { background: var(--bad-soft); border-color: #efc2b8; }
+.rmark { font-weight: 800; width: 1.1em; } .ritem.ok .rmark { color: var(--ok); } .ritem.no .rmark { color: var(--bad); }
+.rbody { flex: 1; min-width: 0; } .rq { color: var(--muted); font-size: .9rem; } .rkey { color: var(--ok); }
+.steps button.step { border: 0; text-align: left; cursor: pointer; font: inherit; font-size: .9rem; font-weight: 600; }
+.steps button.step:hover { outline: 2px solid var(--navy-2); }
+.spin { display: inline-block; width: 12px; height: 12px; border: 2px solid #c5d0dc; border-top-color: var(--navy); border-radius: 50%; animation: sp 1s linear infinite; vertical-align: middle; }
+@keyframes sp { to { transform: rotate(360deg); } }
 
 /* Audio */
 .audio { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 10px; background: #eef2f7; margin-bottom: 16px; flex-wrap: wrap; }

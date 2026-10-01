@@ -34,12 +34,12 @@
 
 <script type="module">
 import { DB, DEMO } from './db.js';
-import { esc, fmt, splitTest, mergeTest, grade, itemsOf, optionsFor, answerText, label, TYPE_LABEL, isTextType, pct } from './engine.js';
+import { esc, fmt, splitTest, mergeTest, grade, itemsOf, optionsFor, answerText, label, TYPE_LABEL, isTextType, pct, buildResult } from './engine.js';
 
 const $ = s => document.querySelector(s);
 const app = $('#app');
 let tests = [], cur = null, curContent = null, curKey = null, subs = [], stats = null, unsub = null, tab = 'overview', detail = null;
-let lastSummary = '', sumTimer = null;
+let lastSummary = '', sumTimer = null, resultSig = {};
 const STATUS = { draft: 'Entwurf', open: 'Offen', closed: 'Geschlossen' };
 const badge = st => `<span class="badge b-${st}">${STATUS[st] || st}</span>`;
 const base = location.href.replace(/konsole\.html.*$/, '');
@@ -86,7 +86,7 @@ const emptyMain = () => `<div class="card"><h2>Noch kein Test</h2><p>Importiere 
 
 async function selectTest(id) {
   if (unsub) { unsub(); unsub = null; }
-  cur = tests.find(t => t.id === id); detail = null; lastSummary = '';
+  cur = tests.find(t => t.id === id); detail = null; lastSummary = ''; resultSig = {};
   document.querySelectorAll('.tcard').forEach(b => b.classList.toggle('on', b.dataset.id === id));
   curContent = JSON.parse(cur.content);
   curKey = await DB.getKey(id);
@@ -126,6 +126,7 @@ function recompute() {
     const p_ = graded.length ? okArr.reduce((a, b) => a + b, 0) / graded.length : null;
     const disc = corr(okArr, rest);
     const flags = [];
+    if (curKey[gid] == null) return { gid, s, p, it, p_: null, disc: null, dist, flags: ['Lösung fehlt'], blank: dist['–'] || 0 };
     if (graded.length >= 5) {
       if (p_ < .3) flags.push('sehr schwer'); if (p_ > .9) flags.push('sehr leicht');
       if (disc != null && disc < .2) flags.push('trennt schlecht');
@@ -144,13 +145,25 @@ function recompute() {
     dur: Math.round(mean(graded.map(x => x.durationSec || 0)) / 60),
     alpha: cronbach(graded, items),
   };
-  scheduleSummary();
+  scheduleSummary(); syncResults();
 }
 function cronbach(graded, items) {
   const k = items.length, n = graded.length; if (k < 2 || n < 3) return null;
   const itemVar = items.reduce((s, it) => { const v = graded.map(x => x.g.items[it.gid]?.pts || 0); return s + sd(v) ** 2; }, 0);
   const tv = sd(graded.map(x => x.g.pts)) ** 2; if (!tv) return null;
   return Math.round(100 * (k / (k - 1)) * (1 - itemVar / tv)) / 100;
+}
+
+// Einzelergebnisse an die Teilnehmenden schicken (nur wer die Abgabe-ID kennt, kann es lesen)
+async function syncResults() {
+  const show = cur.showResults !== false, pass = cur.passPercent ?? 60;
+  for (const x of stats.graded) {
+    const obj = show ? buildResult(curContent, curKey, x.ans, pass) : { hidden: true };
+    const sig = JSON.stringify(obj);
+    if (resultSig[x.id] === sig) continue;
+    resultSig[x.id] = sig;
+    try { await DB.saveResult(cur.id, x.id, obj); } catch (e) { delete resultSig[x.id]; console.error(e); }
+  }
 }
 
 // Öffentliche, anonyme Zusammenfassung (für uebersicht.html)
@@ -174,15 +187,18 @@ function scheduleSummary() {
 // ---------- Darstellung ----------
 function render() {
   const t = cur;
-  const tabs = [['overview', 'Überblick'], ['items', 'Aufgabenanalyse'], ['subs', `Teilnahmen (${stats.n})`], ['settings', 'Einstellungen']];
+  const missing = itemsOf(curContent).filter(x => curKey[x.gid] == null).length;
+  const tabs = [['overview', 'Überblick'], ['items', 'Aufgabenanalyse'], ['subs', `Teilnahmen (${stats.n})`], ['key', missing ? `Lösungen (${missing} fehlen)` : 'Lösungen'], ['settings', 'Einstellungen']];
   $('#main').innerHTML = `<div class="row" style="justify-content:space-between;margin-bottom:6px">
       <div><h1 style="margin:0">${esc(t.title)}</h1><div class="muted">${esc(t.id)} · ${badge(t.status)} · ${t.itemCount || 0} Aufgaben · ${t.maxPoints || 0} Punkte</div></div>
       <div class="row">${statusButtons(t)}</div></div>
+    ${missing ? `<div class="banner">Bei <b>${missing} Aufgaben</b> fehlt noch die Lösung – sie werden nicht gewertet. Eintragen unter <a href="#" id="goKey">Lösungen</a>.</div>` : ''}
     <div class="tabs">${tabs.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     <div id="tabBody"></div>`;
   document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { tab = b.dataset.tab; render(); });
   document.querySelectorAll('[data-status]').forEach(b => b.onclick = () => setStatus(b.dataset.status));
-  ({ overview: tOverview, items: tItems, subs: tSubs, settings: tSettings })[tab]();
+  if ($('#goKey')) $('#goKey').onclick = e => { e.preventDefault(); tab = 'key'; render(); };
+  ({ overview: tOverview, items: tItems, subs: tSubs, key: tKey, settings: tSettings })[tab]();
 }
 function statusButtons(t) {
   if (t.status === 'open') return `<button class="btn ghost" data-status="closed">Test schließen</button>`;
@@ -221,7 +237,7 @@ function tOverview() {
         <h3 style="margin-top:18px">Auffällige Aufgaben</h3>
         ${s.items.filter(i => i.flags.length).slice(0, 8).map(i => `<div class="small">${esc(i.s.title)} › ${esc(i.p.title || i.p.id)} › <b>${esc(label(i.it))}</b> – ${i.flags.map(f => `<span class="flag">${f}</span>`).join(' ')}</div>`).join('') || '<p class="small muted">Keine (ab 5 Abgaben aussagekräftig).</p>'}
       </div></div>
-    <p class="small muted">Die anonyme <a href="uebersicht.html?t=${encodeURIComponent(cur.id)}" target="_blank">Ergebnisübersicht</a> wird automatisch aktualisiert, solange diese Konsole geöffnet ist.</p>`;
+    <p class="small muted">Solange diese Konsole geöffnet ist, bekommen die Teilnehmenden ihr ausführliches Ergebnis direkt nach der Abgabe, und die anonyme <a href="uebersicht.html?t=${encodeURIComponent(cur.id)}" target="_blank">Ergebnisübersicht</a> wird aktualisiert.</p>`;
 }
 
 function contentOverview() {
@@ -298,13 +314,46 @@ function exportCsv() {
   a.download = cur.id + '-ergebnisse.csv'; a.click();
 }
 
+function tKey() {
+  const rows = itemsOf(curContent).map(({ gid, s, p, it }) => {
+    const k = curKey[gid];
+    let ctl;
+    if (isTextType(it.type)) {
+      const v = k == null ? '' : (Array.isArray(k) ? k : [k]).join(' | ');
+      ctl = `<input type="text" data-key="${esc(gid)}" value="${esc(v)}" placeholder="Lösung – Alternativen mit | trennen">`;
+    } else {
+      const cur1 = Array.isArray(k) ? k[0] : k;
+      ctl = `<select class="full" data-key="${esc(gid)}"><option value="">– noch offen –</option>${optionsFor(p, it).map(o => `<option value="${esc(o.k)}" ${cur1 === o.k ? 'selected' : ''}>${esc(o.k)}) ${esc(o.t)}</option>`).join('')}</select>`;
+    }
+    const q = String(it.prompt || '').replace(/\*\*/g, '');
+    return `<tr><td>${esc(s.title)}</td><td>${esc(p.title || p.id)}</td><td><b>${esc(label(it))}</b> <span class="small muted">${esc(q.length > 70 ? q.slice(0, 70) + '…' : q)}</span></td><td style="min-width:240px">${ctl}</td></tr>`;
+  }).join('');
+  $('#tabBody').innerHTML = `<div class="card"><h2>Lösungen</h2>
+    <p class="small muted">Hier kannst du Lösungen eintragen oder korrigieren – zum Beispiel für den Hörteil, nachdem du die Audios angehört hast. Aufgaben ohne Lösung werden nicht gewertet. Nach dem Speichern werden alle Abgaben automatisch neu ausgewertet.</p>
+    <div class="tscroll"><table class="tbl"><thead><tr><th>Abschnitt</th><th>Teil</th><th>Aufgabe</th><th>Lösung</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p style="margin-top:14px"><button class="btn teal" id="saveKey">Lösungen speichern</button> <span id="keyMsg"></span></p></div>`;
+  $('#saveKey').onclick = async () => {
+    const key = { ...curKey };
+    document.querySelectorAll('[data-key]').forEach(el => {
+      const gid = el.dataset.key, v = el.value.trim();
+      if (!v) { delete key[gid]; return; }
+      key[gid] = el.tagName === 'INPUT' ? v.split('|').map(x => x.trim()).filter(Boolean) : v;
+    });
+    $('#saveKey').disabled = true;
+    try { await DB.saveTest(cur.id, {}, key); curKey = key; lastSummary = ''; resultSig = {}; recompute(); render(); }
+    catch (e) { $('#keyMsg').innerHTML = `<span class="badv">${esc(e.message)}</span>`; $('#saveKey').disabled = false; }
+  };
+}
+
 function tSettings() {
   const t = cur, link = base + '?t=' + encodeURIComponent(t.id), over = base + 'uebersicht.html?t=' + encodeURIComponent(t.id);
   $('#tabBody').innerHTML = `<div class="grid2"><div class="card"><h2>Einstellungen</h2>
       <label class="field"><span>Status</span><select class="full" id="st">${Object.entries(STATUS).map(([k, l]) => `<option value="${k}" ${t.status === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       <label class="field"><span>Bestehensgrenze (%)</span><input type="number" id="pp" min="0" max="100" value="${t.passPercent ?? 60}"></label>
       <label class="row"><input type="checkbox" id="an" ${t.askName ? 'checked' : ''}> Namen abfragen (nur in der Konsole sichtbar)</label>
-      <label class="row" style="margin-top:8px"><input type="checkbox" id="pub" ${t.publishResults ? 'checked' : ''}> Einzelergebnisse freigeben (Teilnehmende sehen ihr Ergebnis mit ihrem Code)</label>
+      <label class="row" style="margin-top:8px"><input type="checkbox" id="showRes" ${t.showResults !== false ? 'checked' : ''}> Ausführliches Ergebnis direkt nach der Abgabe zeigen (jede Aufgabe mit Lösung)</label>
+      <p class="small muted" style="margin:4px 0 0 26px">Funktioniert, solange diese Konsole geöffnet ist – sie wertet aus und schickt das Ergebnis an das Gerät der Person.</p>
+      <label class="row" style="margin-top:8px"><input type="checkbox" id="pub" ${t.publishResults ? 'checked' : ''}> Ergebnis zusätzlich in der Übersicht per Code abrufbar</label>
       <p style="margin-top:14px"><button class="btn" id="saveSet">Speichern</button> <span id="setMsg"></span></p></div>
     <div class="card"><h2>Links</h2>
       <p class="small muted">Testlink für die Teilnehmenden</p><div class="row"><span class="linkbox">${esc(link)}</span><button class="btn ghost sm" data-copy="${esc(link)}">Kopieren</button></div>
@@ -316,9 +365,9 @@ function tSettings() {
       <h3 style="margin-top:18px">Löschen</h3><button class="btn danger sm" id="del">Test löschen …</button></div></div>
     <div class="card">${contentOverview()}</div>`;
   $('#saveSet').onclick = async () => {
-    const patch = { status: $('#st').value, passPercent: Math.max(0, Math.min(100, +$('#pp').value || 0)), askName: $('#an').checked, publishResults: $('#pub').checked };
+    const patch = { status: $('#st').value, passPercent: Math.max(0, Math.min(100, +$('#pp').value || 0)), askName: $('#an').checked, publishResults: $('#pub').checked, showResults: $('#showRes').checked };
     await DB.updateTest(t.id, patch); Object.assign(cur, patch); Object.assign(tests.find(x => x.id === t.id), patch);
-    recompute(); renderShell(); render();
+    resultSig = {}; recompute(); renderShell(); render();
   };
   document.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => navigator.clipboard?.writeText(b.dataset.copy).then(() => b.textContent = 'Kopiert ✓'));
   $('#exp').onclick = () => {
@@ -365,7 +414,6 @@ function openImport() {
     const ex = tests.find(t => t.id === parsed.id);
     const fields = { ...parsed.meta, content: JSON.stringify(parsed.content) };
     if (!ex) Object.assign(fields, { status: 'draft', publishResults: false, createdAt: Date.now() });
-    else { delete fields.askName; delete fields.passPercent; }
     $('#saveImp').disabled = true;
     try { await DB.saveTest(parsed.id, fields, parsed.key); close(); if (unsub) { unsub(); unsub = null; } cur = null; await refreshTests(parsed.id); }
     catch (e) { $('#chk').innerHTML += `<p class="err">Speichern fehlgeschlagen: ${esc(e.message)}</p>`; $('#saveImp').disabled = false; }
