@@ -42,7 +42,7 @@ let tests = [], cur = null, curContent = null, curKey = null, subs = [], stats =
 let lastSummary = '', sumTimer = null, resultSig = {};
 const STATUS = { draft: 'Entwurf', open: 'Offen', closed: 'Geschlossen' };
 const badge = st => `<span class="badge b-${st}">${STATUS[st] || st}</span>`;
-const base = location.href.replace(/konsole\.html.*$/, '');
+const base = new URL('./', location.href).href;
 
 DB.onAdmin(async (admin, user) => {
   if (!admin) {
